@@ -1,148 +1,177 @@
+import ProductionChart from "@/app/components/productionChart";
+import { prisma } from "@/app/lib/prisma";
 
+export default async function DashboardPage() {
+  const [totalAnimais, totalPlantios, totalProdutos, produtosEstoque] =
+    await Promise.all([
+      prisma.animal.count({
+        where: {
+          status_animal: "ATIVO",
+        },
+      }),
 
-export default function DashboardPage() {
+      prisma.plantio.count(),
+
+      prisma.produto.count(),
+
+      prisma.produto.findMany({
+        select: {
+          quantidade: true,
+          estoque_min: true,
+        },
+      }),
+    ]);
+
+  const totalAlertas = produtosEstoque.filter((produto) => {
+    return Number(produto.quantidade) <= Number(produto.estoque_min);
+  }).length;
+
+  const indicadores = [
+    {
+      titulo: "Total de Animais",
+      valor: totalAnimais.toString(),
+      descricao: "Animais ativos cadastrados",
+      icone: "🐄",
+      cor: "bg-green-100",
+    },
+    {
+      titulo: "Plantios Cadastrados",
+      valor: totalPlantios.toString(),
+      descricao: "Registros de plantio",
+      icone: "🌱",
+      cor: "bg-emerald-100",
+    },
+    {
+      titulo: "Produtos em Estoque",
+      valor: totalProdutos.toString(),
+      descricao: "Produtos cadastrados",
+      icone: "📦",
+      cor: "bg-blue-100",
+    },
+    {
+      titulo: "Alertas",
+      valor: totalAlertas.toString(),
+      descricao: "Produtos abaixo do mínimo",
+      icone: "⚠️",
+      cor: "bg-red-100",
+    },
+  ];
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      
+    <div>
+      <header className="mb-8">
+        <p className="text-sm font-semibold uppercase tracking-wider text-green-700">
+          Painel de controle
+        </p>
 
-      <main className="flex-1 p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-800">
-            Dashboard
-          </h1>
+        <h1 className="mt-2 text-3xl font-bold text-slate-900">Dashboard</h1>
 
-          <p className="mt-2 text-slate-500">
-            Visão geral da sua produção agrícola.
+        <p className="mt-2 text-slate-500">
+          Acompanhe os principais dados da sua propriedade rural.
+        </p>
+      </header>
+
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        {indicadores.map((indicador) => (
+          <article
+            key={indicador.titulo}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">
+                  {indicador.titulo}
+                </p>
+
+                <p className="mt-2 text-3xl font-bold text-slate-900">
+                  {indicador.valor}
+                </p>
+              </div>
+
+              <div
+                className={`flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${indicador.cor}`}
+              >
+                {indicador.icone}
+              </div>
+            </div>
+
+            <p className="mt-5 border-t border-slate-100 pt-3 text-sm text-slate-500">
+              {indicador.descricao}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">
+            Resumo da produção
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Produção registrada nos últimos meses
           </p>
-        </div>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">
-                  Total de Animais
-                </p>
-
-                <h2 className="mt-2 text-3xl font-bold text-slate-800">
-                  24
-                </h2>
-              </div>
-
-              <span className="text-4xl">🐄</span>
-            </div>
-
-            <p className="mt-4 text-sm text-green-600">
-              Rebanho cadastrado
-            </p>
+          <div className="mt-6 rounded-xl bg-slate-50 p-4">
+            <ProductionChart />
           </div>
+        </article>
 
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">
-                  Plantações Ativas
-                </p>
+        <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-900">
+            Atividades recentes
+          </h2>
 
-                <h2 className="mt-2 text-3xl font-bold text-slate-800">
-                  6
-                </h2>
-              </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Últimas movimentações do sistema
+          </p>
 
-              <span className="text-4xl">🌱</span>
-            </div>
+          <div className="mt-6 space-y-4">
+            <Atividade
+              icone="🐄"
+              titulo="Novo animal cadastrado"
+              descricao="Animal Estrela foi adicionado"
+              horario="Hoje, às 09:42"
+            />
 
-            <p className="mt-4 text-sm text-green-600">
-              Cultivos em andamento
-            </p>
+            <Atividade
+              icone="🌱"
+              titulo="Plantio atualizado"
+              descricao="Plantio de milho está em andamento"
+              horario="Hoje, às 08:15"
+            />
+
+            <Atividade
+              icone="📦"
+              titulo="Entrada no estoque"
+              descricao="Foram adicionados 320 kg de ração"
+              horario="Ontem, às 16:30"
+            />
           </div>
+        </article>
+      </section>
+    </div>
+  );
+}
 
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">
-                  Itens em Estoque
-                </p>
+type AtividadeProps = {
+  icone: string;
+  titulo: string;
+  descricao: string;
+  horario: string;
+};
 
-                <h2 className="mt-2 text-3xl font-bold text-slate-800">
-                  128
-                </h2>
-              </div>
+function Atividade({ icone, titulo, descricao, horario }: AtividadeProps) {
+  return (
+    <div className="flex items-start gap-3 border-b border-slate-100 pb-4 last:border-0">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+        {icone}
+      </div>
 
-              <span className="text-4xl">📦</span>
-            </div>
-
-            <p className="mt-4 text-sm text-blue-600">
-              Produtos armazenados
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">
-                  Alertas
-                </p>
-
-                <h2 className="mt-2 text-3xl font-bold text-slate-800">
-                  3
-                </h2>
-              </div>
-
-              <span className="text-4xl">⚠️</span>
-            </div>
-
-            <p className="mt-4 text-sm text-red-600">
-              Precisam de atenção
-            </p>
-          </div>
-        </section>
-
-        <section className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-800">
-              Resumo da Produção
-            </h2>
-
-            <div className="mt-6 flex h-64 items-center justify-center rounded-lg bg-slate-50">
-              <p className="text-slate-400">
-                Gráfico será adicionado aqui
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-slate-800">
-              Atividades Recentes
-            </h2>
-
-            <div className="mt-6 space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <p className="font-medium text-slate-700">
-                  Novo animal cadastrado
-                </p>
-                <p className="text-sm text-slate-400">Hoje</p>
-              </div>
-
-              <div className="border-b border-slate-100 pb-3">
-                <p className="font-medium text-slate-700">
-                  Plantio de milho registrado
-                </p>
-                <p className="text-sm text-slate-400">Ontem</p>
-              </div>
-
-              <div>
-                <p className="font-medium text-slate-700">
-                  Estoque de ração atualizado
-                </p>
-                <p className="text-sm text-slate-400">
-                  2 dias atrás
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
+      <div>
+        <p className="font-semibold text-slate-800">{titulo}</p>
+        <p className="text-sm text-slate-500">{descricao}</p>
+        <p className="mt-1 text-xs text-slate-400">{horario}</p>
+      </div>
     </div>
   );
 }
