@@ -1,4 +1,6 @@
 import { prisma } from "@/app/lib/prisma";
+import ProdutoModal from "@/app/components/produtomodal";
+import MovimentacaoModal from "@/app/components/movimentacaomodal";
 
 export default async function EstoquePage() {
   const produtos = await prisma.produto.findMany({
@@ -8,14 +10,11 @@ export default async function EstoquePage() {
   });
 
   const produtosAbaixoMinimo = produtos.filter(
-    (produto) =>
-      Number(produto.quantidade) <=
-      Number(produto.estoque_min),
+    (produto) => Number(produto.quantidade) <= Number(produto.estoque_min),
   );
 
   const quantidadeTotal = produtos.reduce(
-    (total, produto) =>
-      total + Number(produto.quantidade),
+    (total, produto) => total + Number(produto.quantidade),
     0,
   );
 
@@ -36,9 +35,10 @@ export default async function EstoquePage() {
           </p>
         </div>
 
-        <button className="rounded-xl bg-green-800 px-5 py-3 font-semibold text-white hover:bg-green-900">
+        {/* <button className="rounded-xl bg-green-800 px-5 py-3 font-semibold text-white hover:bg-green-900">
           + Novo produto
-        </button>
+        </button> */}
+        <ProdutoModal />
       </header>
 
       <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -67,22 +67,18 @@ export default async function EstoquePage() {
 
       {produtosAbaixoMinimo.length > 0 && (
         <section className="mb-6 rounded-2xl border border-yellow-200 bg-yellow-50 p-5">
-          <h2 className="font-bold text-yellow-900">
-            Atenção ao estoque
-          </h2>
+          <h2 className="font-bold text-yellow-900">Atenção ao estoque</h2>
 
           <p className="mt-1 text-sm text-yellow-800">
-            {produtosAbaixoMinimo.length} produto(s)
-            atingiram ou ficaram abaixo da quantidade mínima.
+            {produtosAbaixoMinimo.length} produto(s) atingiram ou ficaram abaixo
+            da quantidade mínima.
           </p>
         </section>
       )}
 
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-100 p-5">
-          <h2 className="font-bold text-slate-900">
-            Produtos armazenados
-          </h2>
+          <h2 className="font-bold text-slate-900">Produtos armazenados</h2>
 
           <p className="mt-1 text-sm text-slate-500">
             {produtos.length} registros encontrados
@@ -118,14 +114,10 @@ export default async function EstoquePage() {
               <tbody className="divide-y divide-slate-100">
                 {produtos.map((produto) => {
                   const estoqueBaixo =
-                    Number(produto.quantidade) <=
-                    Number(produto.estoque_min);
+                    Number(produto.quantidade) <= Number(produto.estoque_min);
 
                   return (
-                    <tr
-                      key={produto.id_produto}
-                      className="hover:bg-green-50"
-                    >
+                    <tr key={produto.id_produto} className="hover:bg-green-50">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
@@ -150,9 +142,7 @@ export default async function EstoquePage() {
 
                       <td className="px-5 py-4">
                         <strong className="text-slate-800">
-                          {Number(
-                            produto.quantidade,
-                          ).toFixed(2)}
+                          {Number(produto.quantidade).toFixed(2)}
                         </strong>
 
                         <span className="ml-1 text-xs text-slate-400">
@@ -161,9 +151,7 @@ export default async function EstoquePage() {
                       </td>
 
                       <td className="px-5 py-4 text-slate-600">
-                        {Number(
-                          produto.estoque_min,
-                        ).toFixed(2)}{" "}
+                        {Number(produto.estoque_min).toFixed(2)}{" "}
                         {produto.unidade_medida}
                       </td>
 
@@ -175,16 +163,20 @@ export default async function EstoquePage() {
                               : "rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700"
                           }
                         >
-                          {estoqueBaixo
-                            ? "Estoque baixo"
-                            : "Normal"}
+                          {estoqueBaixo ? "Estoque baixo" : "Normal"}
                         </span>
                       </td>
 
                       <td className="px-5 py-4">
-                        <button className="font-semibold text-green-700 hover:text-green-900">
+                        {/*<button className="font-semibold text-green-700 hover:text-green-900">
                           Movimentar
-                        </button>
+                        </button>*/}
+                        <MovimentacaoModal
+                          idProduto={produto.id_produto}
+                          nomeProduto={produto.nome_produto}
+                          quantidadeAtual={Number(produto.quantidade)}
+                          unidadeMedida={produto.unidade_medida}
+                        />
                       </td>
                     </tr>
                   );
@@ -206,24 +198,14 @@ type CardProps = {
   alerta?: boolean;
 };
 
-function Card({
-  titulo,
-  valor,
-  descricao,
-  icone,
-  alerta = false,
-}: CardProps) {
+function Card({ titulo, valor, descricao, icone, alerta = false }: CardProps) {
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm text-slate-500">
-            {titulo}
-          </p>
+          <p className="text-sm text-slate-500">{titulo}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {valor}
-          </p>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{valor}</p>
         </div>
 
         <div
@@ -237,9 +219,7 @@ function Card({
         </div>
       </div>
 
-      <p className="mt-4 text-sm text-slate-500">
-        {descricao}
-      </p>
+      <p className="mt-4 text-sm text-slate-500">{descricao}</p>
     </article>
   );
 }
