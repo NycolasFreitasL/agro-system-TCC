@@ -8,6 +8,18 @@ export default async function EstoquePage() {
       nome_produto: "asc",
     },
   });
+  const movimentacoes = await prisma.move_estoque.findMany({
+    take: 10,
+
+    orderBy: {
+      data_movimentacao: "desc",
+    },
+
+    include: {
+      produto: true,
+      usuarios: true,
+    },
+  });
 
   const produtosAbaixoMinimo = produtos.filter(
     (produto) => Number(produto.quantidade) <= Number(produto.estoque_min),
@@ -181,6 +193,98 @@ export default async function EstoquePage() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5">
+          <h2 className="font-bold text-slate-900">Movimentações recentes</h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Últimas entradas e saídas registradas
+          </p>
+        </div>
+
+        {movimentacoes.length === 0 ? (
+          <div className="p-10 text-center">
+            <p className="text-4xl">📋</p>
+
+            <p className="mt-3 font-semibold text-slate-700">
+              Nenhuma movimentação registrada
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[800px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Data</th>
+                  <th className="px-5 py-3">Produto</th>
+                  <th className="px-5 py-3">Tipo</th>
+                  <th className="px-5 py-3">Quantidade</th>
+                  <th className="px-5 py-3">Responsável</th>
+                  <th className="px-5 py-3">Observação</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {movimentacoes.map((movimentacao) => (
+                  <tr
+                    key={movimentacao.id_movimentacao}
+                    className="hover:bg-slate-50"
+                  >
+                    <td className="px-5 py-4 text-slate-500">
+                      {movimentacao.data_movimentacao.toLocaleString("pt-BR", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                        timeZone: "America/Sao_Paulo",
+                      })}
+                    </td>
+
+                    <td className="px-5 py-4 font-semibold text-slate-800">
+                      {movimentacao.produto.nome_produto}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <span
+                        className={
+                          movimentacao.tipo_movimento === "ENTRADA"
+                            ? "rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700"
+                            : "rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700"
+                        }
+                      >
+                        {movimentacao.tipo_movimento}
+                      </span>
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <strong
+                        className={
+                          movimentacao.tipo_movimento === "ENTRADA"
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }
+                      >
+                        {movimentacao.tipo_movimento === "ENTRADA" ? "+" : "-"}
+                        {Number(movimentacao.quantidade_move).toFixed(2)}
+                      </strong>
+
+                      <span className="ml-1 text-xs text-slate-400">
+                        {movimentacao.produto.unidade_medida}
+                      </span>
+                    </td>
+
+                    <td className="px-5 py-4 text-slate-600">
+                      {movimentacao.usuarios.nome_usuario}
+                    </td>
+
+                    <td className="max-w-64 truncate px-5 py-4 text-slate-500">
+                      {movimentacao.observacao || "Sem observação"}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
