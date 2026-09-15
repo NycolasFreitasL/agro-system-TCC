@@ -10,25 +10,50 @@ import {
   YAxis,
 } from "recharts";
 
-const dadosProducao = [
-  { mes: "Abr", producao: 12 },
-  { mes: "Mai", producao: 18 },
-  { mes: "Jun", producao: 15 },
-  { mes: "Jul", producao: 26 },
-  { mes: "Ago", producao: 23 },
-  { mes: "Set", producao: 32 },
-];
+type DadoProducao = {
+  mes: string;
+  producao: number;
+};
 
-export default function ProductionChart() {
+type ProductionChartProps = {
+  dados: DadoProducao[];
+};
+
+export default function ProductionChart({
+  dados,
+}: ProductionChartProps) {
+  const possuiDados = dados.some(
+    (item) => item.producao > 0,
+  );
+
+  if (!possuiDados) {
+    return (
+      <div className="flex h-64 flex-col items-center justify-center text-center">
+        <span className="text-4xl">🌾</span>
+
+        <p className="mt-3 font-semibold text-slate-700">
+          Nenhuma produção no período
+        </p>
+
+        <p className="mt-1 text-sm text-slate-400">
+          Registre colheitas em kg ou toneladas.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-64 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+      >
         <AreaChart
-          data={dadosProducao}
+          data={dados}
           margin={{
             top: 10,
             right: 10,
-            left: -20,
+            left: -10,
             bottom: 0,
           }}
         >
@@ -83,7 +108,8 @@ export default function ProductionChart() {
             contentStyle={{
               borderRadius: "12px",
               border: "1px solid #e2e8f0",
-              boxShadow: "0 10px 25px rgba(15, 23, 42, 0.08)",
+              boxShadow:
+                "0 10px 25px rgba(15, 23, 42, 0.08)",
             }}
             labelStyle={{
               color: "#334155",
@@ -94,7 +120,7 @@ export default function ProductionChart() {
           <Area
             type="monotone"
             dataKey="producao"
-            name="Produção"
+            name="Produção (kg)"
             stroke="#15803d"
             strokeWidth={3}
             fill="url(#corProducao)"

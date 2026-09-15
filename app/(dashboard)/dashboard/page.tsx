@@ -26,6 +26,76 @@ export default async function DashboardPage() {
     return Number(produto.quantidade) <= Number(produto.estoque_min);
   }).length;
 
+  const hoje = new Date();
+
+  const inicioPeriodo = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+
+  const colheitas = await prisma.colheita.findMany({
+    where: {
+      data_colheita: {
+        gte: inicioPeriodo,
+      },
+    },
+
+    select: {
+      data_colheita: true,
+      quantidade_colheita: true,
+      unidade_medida: true,
+    },
+  });
+
+  const dadosProducao = Array.from(
+    {
+      length: 6,
+    },
+    (_, indice) => {
+      const data = new Date(
+        hoje.getFullYear(),
+        hoje.getMonth() - 5 + indice,
+        1,
+      );
+
+      return {
+        chave: `${data.getFullYear()}-${data.getMonth()}`,
+        mes: new Intl.DateTimeFormat("pt-BR", {
+          month: "short",
+        })
+          .format(data)
+          .replace(".", ""),
+        producao: 0,
+      };
+    },
+  );
+
+  colheitas.forEach((colheita) => {
+    const chave =
+      `${colheita.data_colheita.getFullYear()}-` +
+      `${colheita.data_colheita.getMonth()}`;
+
+    const mes = dadosProducao.find((item) => item.chave === chave);
+
+    if (!mes) {
+      return;
+    }
+
+    const quantidade = Number(colheita.quantidade_colheita);
+
+    const unidade = colheita.unidade_medida.toUpperCase();
+
+    if (unidade === "KG") {
+      mes.producao += quantidade;
+    }
+
+    if (unidade === "TONELADA" || unidade === "TONELADAS") {
+      mes.producao += quantidade * 1000;
+    }
+  });
+
+  const dadosDoGrafico = dadosProducao.map(({ mes, producao }) => ({
+    mes,
+    producao,
+  }));
+
   const indicadores = [
     {
       titulo: "Total de Animais",
@@ -112,7 +182,7 @@ export default async function DashboardPage() {
           </p>
 
           <div className="mt-6 rounded-xl bg-slate-50 p-4">
-            <ProductionChart />
+            <ProductionChart dados={dadosDoGrafico} />
           </div>
         </article>
 

@@ -15,6 +15,25 @@ export default async function PlantioPage() {
     },
   });
 
+  const colheitas = await prisma.colheita.findMany({
+    take: 10,
+
+    orderBy: {
+      data_colheita: "desc",
+    },
+
+    include: {
+      plantio: {
+        include: {
+          produto: true,
+          lote: true,
+        },
+      },
+
+      usuarios: true,
+    },
+  });
+
   const lotesDoBanco = await prisma.lote.findMany({
     where: {
       status_lote: "ATIVO",
@@ -241,6 +260,95 @@ export default async function PlantioPage() {
                     </tr>
                   );
                 })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 p-5">
+          <h2 className="font-bold text-slate-900">Colheitas recentes</h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Últimas produções registradas
+          </p>
+        </div>
+
+        {colheitas.length === 0 ? (
+          <div className="p-10 text-center">
+            <p className="text-5xl">🌾</p>
+
+            <h3 className="mt-4 font-bold text-slate-800">
+              Nenhuma colheita registrada
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-500">
+              As colheitas aparecerão aqui após o registro.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Data</th>
+                  <th className="px-5 py-3">Cultura</th>
+                  <th className="px-5 py-3">Lote</th>
+                  <th className="px-5 py-3">Quantidade</th>
+                  <th className="px-5 py-3">Responsável</th>
+                  <th className="px-5 py-3">Observação</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {colheitas.map((colheita) => (
+                  <tr key={colheita.id_colheita} className="hover:bg-green-50">
+                    <td className="px-5 py-4 text-slate-600">
+                      {formatarData(colheita.data_colheita)}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-100">
+                          🌾
+                        </div>
+
+                        <div>
+                          <p className="font-semibold text-slate-800">
+                            {colheita.plantio.produto.nome_produto}
+                          </p>
+
+                          <p className="text-xs text-slate-400">
+                            Colheita #{colheita.id_colheita}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="px-5 py-4 text-slate-600">
+                      {colheita.plantio.lote.nome_lote}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <strong className="text-green-700">
+                        {Number(colheita.quantidade_colheita).toFixed(2)}
+                      </strong>
+
+                      <span className="ml-1 text-xs text-slate-400">
+                        {colheita.unidade_medida}
+                      </span>
+                    </td>
+
+                    <td className="px-5 py-4 text-slate-600">
+                      {colheita.usuarios.nome_usuario}
+                    </td>
+
+                    <td className="max-w-64 truncate px-5 py-4 text-slate-500">
+                      {colheita.observacao || "Sem observação"}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
