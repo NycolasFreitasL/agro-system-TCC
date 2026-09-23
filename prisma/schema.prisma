@@ -124,9 +124,14 @@ model plantio {
   quantidade_plantada Decimal        @db.Decimal(10, 2)
   status_plantio      String         @db.VarChar(20)
   id_usuario          Int
+  id_cultura          Int?
+  area_plantada       Decimal?       @db.Decimal(10, 2)
+  unidade_plantada    String?        @db.VarChar(20)
+  prev_germinacao     DateTime?      @db.Date
   colheita            colheita[]
   fertilizacao        fertilizacao[]
   irrigacao           irrigacao[]
+  cultura             cultura?       @relation(fields: [id_cultura], references: [id_cultura], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_cultura")
   lote                lote           @relation(fields: [id_lote], references: [id_lote], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_lote")
   produto             produto        @relation(fields: [id_produto], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_produto")
   usuarios            usuarios       @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_usuario")
@@ -142,10 +147,12 @@ model produto {
   unidade_medida String         @db.VarChar(20)
   criado_em      DateTime?      @default(now()) @db.Timestamp(6)
   atualizado_em  DateTime?      @default(now()) @db.Timestamp(6)
+  id_cultura     Int?
   alimentacao    alimentacao[]
   fertilizacao   fertilizacao[]
   move_estoque   move_estoque[]
   plantio        plantio[]
+  cultura        cultura?       @relation(fields: [id_cultura], references: [id_cultura], onDelete: NoAction, onUpdate: NoAction, map: "fk_produto_cultura")
   vacinacao      vacinacao[]
 }
 
@@ -179,4 +186,21 @@ model vacinacao {
   animal      animal   @relation(fields: [id_animal], references: [id_animal], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_animal")
   produto     produto  @relation(fields: [id_produto], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_produto")
   usuarios    usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_usuario")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cultura {
+  id_cultura              Int       @id @default(autoincrement())
+  nome_cultura            String    @unique @db.VarChar(100)
+  dias_germinacao_min     Int
+  dias_germinacao_max     Int
+  ciclo_dias_min          Int
+  ciclo_dias_max          Int
+  produtividade_min_kg_ha Decimal   @db.Decimal(10, 2)
+  produtividade_max_kg_ha Decimal   @db.Decimal(10, 2)
+  ativo                   Boolean   @default(true)
+  criado_em               DateTime  @default(now()) @db.Timestamp(6)
+  atualizado_em           DateTime  @default(now()) @db.Timestamp(6)
+  plantio                 plantio[]
+  produto                 produto[]
 }

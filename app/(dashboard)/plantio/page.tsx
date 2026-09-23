@@ -45,6 +45,14 @@ export default async function PlantioPage() {
   });
 
   const produtosDoBanco = await prisma.produto.findMany({
+    where: {
+      categoria: "Semente",
+      cultura: {
+        is: {
+          ativo: true,
+        },
+      },
+    },
     orderBy: {
       nome_produto: "asc",
     },
