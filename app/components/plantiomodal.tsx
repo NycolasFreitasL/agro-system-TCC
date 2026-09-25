@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Lote = {
@@ -30,15 +27,25 @@ export default function PlantioModal({
   const [modalAberto, setModalAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
+  const [idLote, setIdLote] = useState("");
+  const [idProduto, setIdProduto] = useState("");
 
   const router = useRouter();
 
+  const loteSelecionado = lotes.find(
+    (lote) => lote.id_lote === Number(idLote),
+  );
+
+  const produtoSelecionado = produtos.find(
+    (produto) => produto.id_produto === Number(idProduto),
+  );
+
   function fecharModal() {
-    if (carregando) {
-      return;
-    }
+    if (carregando) return;
 
     setErro("");
+    setIdLote("");
+    setIdProduto("");
     setModalAberto(false);
   }
 
@@ -56,28 +63,22 @@ export default function PlantioModal({
     try {
       const resposta = await fetch("/api/plantios", {
         method: "POST",
-
         headers: {
           "Content-Type": "application/json",
         },
-
         body: JSON.stringify({
           idLote: formData.get("lote"),
           idProduto: formData.get("produto"),
           dataPlantio: formData.get("dataPlantio"),
-          previsaoColheita:
-            formData.get("previsaoColheita"),
+          previsaoColheita: formData.get("previsaoColheita"),
           quantidade: formData.get("quantidade"),
-          status: formData.get("status"),
+          areaPlantada: formData.get("areaPlantada"),
         }),
       });
 
-      const tipoResposta =
-        resposta.headers.get("content-type");
+      const tipoResposta = resposta.headers.get("content-type");
 
-      if (
-        !tipoResposta?.includes("application/json")
-      ) {
+      if (!tipoResposta?.includes("application/json")) {
         throw new Error(
           "A API de plantios não respondeu corretamente.",
         );
@@ -87,12 +88,13 @@ export default function PlantioModal({
 
       if (!resposta.ok) {
         throw new Error(
-          dados.error ||
-            "Não foi possível cadastrar o plantio.",
+          dados.error || "Não foi possível cadastrar o plantio.",
         );
       }
 
       formulario.reset();
+      setIdLote("");
+      setIdProduto("");
       setModalAberto(false);
       router.refresh();
     } catch (error) {
@@ -107,26 +109,34 @@ export default function PlantioModal({
   }
 
   useEffect(() => {
+    if (!modalAberto) return;
+
     function fecharComEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        fecharModal();
+      if (event.key === "Escape" && !carregando) {
+        setErro("");
+        setIdLote("");
+        setIdProduto("");
+        setModalAberto(false);
       }
     }
 
-    if (modalAberto) {
-      window.addEventListener(
-        "keydown",
-        fecharComEscape,
-      );
-    }
+    window.addEventListener("keydown", fecharComEscape);
 
     return () => {
-      window.removeEventListener(
-        "keydown",
-        fecharComEscape,
-      );
+      window.removeEventListener("keydown", fecharComEscape);
     };
   }, [modalAberto, carregando]);
+
+  useEffect(() => {
+    if (!modalAberto) return;
+
+    const overflowAnterior = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = overflowAnterior;
+    };
+  }, [modalAberto]);
 
   return (
     <>
@@ -146,10 +156,9 @@ export default function PlantioModal({
           <div
             role="dialog"
             aria-modal="true"
+            aria-labelledby="titulo-modal-plantio"
             className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-            onMouseDown={(event) =>
-              event.stopPropagation()
-            }
+            onMouseDown={(event) => event.stopPropagation()}
           >
             <header className="flex items-start justify-between border-b border-slate-200 p-6">
               <div>
@@ -157,35 +166,37 @@ export default function PlantioModal({
                   Agricultura
                 </p>
 
-                <h2 className="mt-1 text-2xl font-bold text-slate-900">
+                <h2
+                  id="titulo-modal-plantio"
+                  className="mt-1 text-2xl font-bold text-slate-900"
+                >
                   Cadastrar plantio
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Registre um novo ciclo de cultivo.
+                  Registre a semente e a área utilizada no lote.
                 </p>
               </div>
 
               <button
                 type="button"
+                aria-label="Fechar modal"
                 onClick={fecharModal}
                 disabled={carregando}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-slate-100"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
                 ×
               </button>
             </header>
 
-            <form
-              onSubmit={cadastrarPlantio}
-              className="p-6"
-            >
+            <form onSubmit={cadastrarPlantio} className="p-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <Campo titulo="Lote" obrigatorio>
                   <select
                     name="lote"
                     required
-                    defaultValue=""
+                    value={idLote}
+                    onChange={(event) => setIdLote(event.target.value)}
                     className="input"
                   >
                     <option value="" disabled>
@@ -197,22 +208,22 @@ export default function PlantioModal({
                         key={lote.id_lote}
                         value={lote.id_lote}
                       >
-                        {lote.nome_lote} —{" "}
-                        {lote.area.toFixed(2)} ha
+                        {lote.nome_lote} — {lote.area.toFixed(2)} ha
                       </option>
                     ))}
                   </select>
                 </Campo>
 
-                <Campo titulo="Cultura/produto" obrigatorio>
+                <Campo titulo="Semente" obrigatorio>
                   <select
                     name="produto"
                     required
-                    defaultValue=""
+                    value={idProduto}
+                    onChange={(event) => setIdProduto(event.target.value)}
                     className="input"
                   >
                     <option value="" disabled>
-                      Selecione a cultura
+                      Selecione a semente
                     </option>
 
                     {produtos.map((produto) => (
@@ -226,14 +237,51 @@ export default function PlantioModal({
                   </select>
                 </Campo>
 
-                <Campo
-                  titulo="Data do plantio"
-                  obrigatorio
-                >
+                <Campo titulo="Área plantada (ha)" obrigatorio>
+                  <input
+                    name="areaPlantada"
+                    type="number"
+                    required
+                    min="0.01"
+                    max={loteSelecionado?.area}
+                    step="0.01"
+                    placeholder="Ex.: 2,50"
+                    className="input"
+                  />
+
+                  {loteSelecionado && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Área total do lote:{" "}
+                      {loteSelecionado.area.toFixed(2)} ha
+                    </p>
+                  )}
+                </Campo>
+
+                <Campo titulo="Quantidade de sementes" obrigatorio>
+                  <input
+                    name="quantidade"
+                    type="number"
+                    required
+                    min="0.01"
+                    step="0.01"
+                    placeholder="Ex.: 100"
+                    className="input"
+                  />
+
+                  {produtoSelecionado && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Unidade cadastrada no estoque:{" "}
+                      {produtoSelecionado.unidade_medida}
+                    </p>
+                  )}
+                </Campo>
+
+                <Campo titulo="Data do plantio" obrigatorio>
                   <input
                     name="dataPlantio"
                     type="date"
                     required
+                    max={new Date().toISOString().slice(0, 10)}
                     className="input"
                   />
                 </Campo>
@@ -244,46 +292,11 @@ export default function PlantioModal({
                     type="date"
                     className="input"
                   />
-                </Campo>
 
-                <Campo
-                  titulo="Quantidade plantada"
-                  obrigatorio
-                >
-                  <input
-                    name="quantidade"
-                    type="number"
-                    required
-                    min="0.01"
-                    step="0.01"
-                    placeholder="0,00"
-                    className="input"
-                  />
-                </Campo>
-
-                <Campo titulo="Status" obrigatorio>
-                  <select
-                    name="status"
-                    required
-                    defaultValue="ATIVO"
-                    className="input"
-                  >
-                    <option value="ATIVO">
-                      Ativo
-                    </option>
-
-                    <option value="EM ANDAMENTO">
-                      Em andamento
-                    </option>
-
-                    <option value="CONCLUÍDO">
-                      Concluído
-                    </option>
-
-                    <option value="CANCELADO">
-                      Cancelado
-                    </option>
-                  </select>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Se ficar em branco, será calculada pelo ciclo
+                    estimado da cultura.
+                  </p>
                 </Campo>
               </div>
 
@@ -295,12 +308,15 @@ export default function PlantioModal({
 
               {produtos.length === 0 && (
                 <p className="mt-6 rounded-xl bg-yellow-50 p-4 text-sm font-medium text-yellow-800">
-                  Não existem produtos cadastrados.
+                  Não existem sementes vinculadas a culturas ativas.
                 </p>
               )}
 
               {erro && (
-                <p className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700">
+                <p
+                  role="alert"
+                  className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700"
+                >
                   {erro}
                 </p>
               )}
@@ -310,7 +326,7 @@ export default function PlantioModal({
                   type="button"
                   onClick={fecharModal}
                   disabled={carregando}
-                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-600"
+                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -352,7 +368,6 @@ function Campo({
     <label className="block">
       <span className="text-sm font-semibold text-slate-700">
         {titulo}
-
         {obrigatorio && (
           <span className="ml-1 text-red-500">*</span>
         )}
