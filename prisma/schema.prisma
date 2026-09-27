@@ -49,7 +49,9 @@ model colheita {
   unidade_medida      String   @db.VarChar(20)
   observacao          String?  @db.VarChar(255)
   id_usuario          Int
+  id_produto_destino  Int?
   plantio             plantio  @relation(fields: [id_plantio], references: [id_plantio], onDelete: NoAction, onUpdate: NoAction, map: "fk_colheita_plantio")
+  produto             produto? @relation(fields: [id_produto_destino], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_colheita_produto_destino")
   usuarios            usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_colheita_usuario")
 }
 
@@ -149,6 +151,7 @@ model produto {
   atualizado_em  DateTime?      @default(now()) @db.Timestamp(6)
   id_cultura     Int?
   alimentacao    alimentacao[]
+  colheita       colheita[]
   fertilizacao   fertilizacao[]
   move_estoque   move_estoque[]
   plantio        plantio[]

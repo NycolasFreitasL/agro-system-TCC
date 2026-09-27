@@ -1,9 +1,8 @@
 import { prisma } from "@/app/lib/prisma";
 import PlantioModal from "@/app/components/plantiomodal";
 import ColheitaModal from "@/app/components/colheitamodal";
-import CultivoPainel, {
-  DetalhesCultivo,
-} from "@/app/components/cultivopainel";
+import EncerrarCultivo from "@/app/components/encerrar-cultivo";
+import CultivoPainel, { DetalhesCultivo } from "@/app/components/cultivopainel";
 
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -28,19 +27,12 @@ function dataFormatada(data: Date | null) {
 
 function diaCalendario(data: Date) {
   return Math.floor(
-    Date.UTC(
-      data.getUTCFullYear(),
-      data.getUTCMonth(),
-      data.getUTCDate(),
-    ) / DIA,
+    Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate()) /
+      DIA,
   );
 }
 
-function progressoDoCiclo(
-  inicio: Date,
-  previsao: Date | null,
-  hoje: number,
-) {
+function progressoDoCiclo(inicio: Date, previsao: Date | null, hoje: number) {
   if (!previsao) return null;
 
   const primeiroDia = diaCalendario(inicio);
@@ -51,10 +43,7 @@ function progressoDoCiclo(
 
   return Math.max(
     0,
-    Math.min(
-      100,
-      Math.round(((hoje - primeiroDia) / duracao) * 100),
-    ),
+    Math.min(100, Math.round(((hoje - primeiroDia) / duracao) * 100)),
   );
 }
 
@@ -71,48 +60,44 @@ type Evento = {
 };
 
 export default async function PlantioPage() {
-  const [plantios, lotesBanco, sementesBanco] =
-    await Promise.all([
-      prisma.plantio.findMany({
-        include: {
-          cultura: true,
-          produto: true,
-          lote: true,
-          usuarios: true,
-          colheita: true,
-          irrigacao: true,
-          fertilizacao: {
-            include: {
-              produto: true,
-            },
+  const [plantios, lotesBanco, sementesBanco] = await Promise.all([
+    prisma.plantio.findMany({
+      include: {
+        cultura: true,
+        produto: true,
+        lote: true,
+        usuarios: true,
+        colheita: true,
+        irrigacao: true,
+        fertilizacao: {
+          include: {
+            produto: true,
           },
         },
-        orderBy: [
-          { data_plantio: "desc" },
-          { id_plantio: "desc" },
-        ],
-      }),
+      },
+      orderBy: [{ data_plantio: "desc" }, { id_plantio: "desc" }],
+    }),
 
-      prisma.lote.findMany({
-        orderBy: {
-          nome_lote: "asc",
-        },
-      }),
+    prisma.lote.findMany({
+      orderBy: {
+        nome_lote: "asc",
+      },
+    }),
 
-      prisma.produto.findMany({
-        where: {
-          categoria: "Semente",
-          cultura: {
-            is: {
-              ativo: true,
-            },
+    prisma.produto.findMany({
+      where: {
+        categoria: "Semente",
+        cultura: {
+          is: {
+            ativo: true,
           },
         },
-        orderBy: {
-          nome_produto: "asc",
-        },
-      }),
-    ]);
+      },
+      orderBy: {
+        nome_produto: "asc",
+      },
+    }),
+  ]);
 
   type Plantio = (typeof plantios)[number];
 
@@ -139,8 +124,7 @@ export default async function PlantioPage() {
   }));
 
   const areaCultivada = ativos.reduce(
-    (total, plantio) =>
-      total + Number(plantio.area_plantada ?? 0),
+    (total, plantio) => total + Number(plantio.area_plantada ?? 0),
     0,
   );
 
@@ -159,12 +143,9 @@ export default async function PlantioPage() {
   const parte = (tipo: string) =>
     partesHoje.find((item) => item.type === tipo)!.value;
 
-  const hojeTexto =
-    `${parte("year")}-${parte("month")}-${parte("day")}`;
+  const hojeTexto = `${parte("year")}-${parte("month")}-${parte("day")}`;
 
-  const hoje = diaCalendario(
-    new Date(`${hojeTexto}T12:00:00.000Z`),
-  );
+  const hoje = diaCalendario(new Date(`${hojeTexto}T12:00:00.000Z`));
 
   const previsoes = ativos
     .filter(
@@ -172,11 +153,7 @@ export default async function PlantioPage() {
         plantio.prev_colheita !== null &&
         diaCalendario(plantio.prev_colheita) >= hoje,
     )
-    .sort(
-      (a, b) =>
-        a.prev_colheita!.getTime() -
-        b.prev_colheita!.getTime(),
-    );
+    .sort((a, b) => a.prev_colheita!.getTime() - b.prev_colheita!.getTime());
 
   const proximaColheita = previsoes[0];
 
@@ -184,9 +161,7 @@ export default async function PlantioPage() {
     .flatMap((plantio) => {
       const base = {
         idPlantio: plantio.id_plantio,
-        cultura:
-          plantio.cultura?.nome_cultura ??
-          plantio.produto.nome_produto,
+        cultura: plantio.cultura?.nome_cultura ?? plantio.produto.nome_produto,
         lote: plantio.lote.nome_lote,
       };
 
@@ -216,9 +191,7 @@ export default async function PlantioPage() {
           chave: `fertilizacao-${registro.id_fertilizacao}`,
           tipo: "Fertilização",
           data: registro.data_fertilizacao,
-          quantidade: Number(
-            registro.quantidade_fertilizacao,
-          ),
+          quantidade: Number(registro.quantidade_fertilizacao),
           unidade: registro.produto.unidade_medida,
           observacao: registro.observacao,
         })),
@@ -229,15 +202,12 @@ export default async function PlantioPage() {
   const colheitasNoMes = eventos.filter(
     (evento) =>
       evento.tipo === "Colheita" &&
-      evento.data.toISOString().slice(0, 7) ===
-        hojeTexto.slice(0, 7) &&
+      evento.data.toISOString().slice(0, 7) === hojeTexto.slice(0, 7) &&
       diaCalendario(evento.data) <= hoje,
   ).length;
 
   function cardPlantio(plantio: Plantio) {
-    const nome =
-      plantio.cultura?.nome_cultura ??
-      plantio.produto.nome_produto;
+    const nome = plantio.cultura?.nome_cultura ?? plantio.produto.nome_produto;
 
     const progresso = progressoDoCiclo(
       plantio.data_plantio,
@@ -325,21 +295,16 @@ export default async function PlantioPage() {
 
         {previsaoAtingida && (
           <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-            A data prevista de colheita foi atingida.
-            Confira a situação do cultivo.
+            A data prevista de colheita foi atingida. Confira a situação do
+            cultivo.
           </p>
         )}
 
         <div className="mt-5 space-y-3 border-t border-slate-100 pt-4">
-          <DetalhesCultivo
-            titulo={`${nome} — Plantio #${plantio.id_plantio}`}
-          >
+          <DetalhesCultivo titulo={`${nome} — Plantio #${plantio.id_plantio}`}>
             <dl className="space-y-3 text-sm">
               <Info titulo="Lote" valor={plantio.lote.nome_lote} />
-              <Info
-                titulo="Semente"
-                valor={plantio.produto.nome_produto}
-              />
+              <Info titulo="Semente" valor={plantio.produto.nome_produto} />
               <Info
                 titulo="Área plantada"
                 valor={
@@ -351,8 +316,7 @@ export default async function PlantioPage() {
               <Info
                 titulo="Sementes utilizadas"
                 valor={`${numero(Number(plantio.quantidade_plantada))} ${
-                  plantio.unidade_plantada ??
-                  plantio.produto.unidade_medida
+                  plantio.unidade_plantada ?? plantio.produto.unidade_medida
                 }`}
               />
               <Info
@@ -373,18 +337,24 @@ export default async function PlantioPage() {
               />
             </dl>
 
-            <h3 className="mb-3 mt-6 font-bold">
-              Registros do cultivo
-            </h3>
+            <h3 className="mb-3 mt-6 font-bold">Registros do cultivo</h3>
 
             <ListaEventos eventos={registros} />
           </DetalhesCultivo>
 
-          <div className="flex justify-end">
-            <ColheitaModal
+          <div className="flex flex-col gap-3">
+            <div className="flex justify-end">
+              <ColheitaModal
+                idPlantio={plantio.id_plantio}
+                nomeCultura={nome}
+                nomeLote={plantio.lote.nome_lote}
+              />
+            </div>
+
+            <EncerrarCultivo
               idPlantio={plantio.id_plantio}
               nomeCultura={nome}
-              nomeLote={plantio.lote.nome_lote}
+              possuiColheita={plantio.colheita.length > 0}
             />
           </div>
         </div>
@@ -396,9 +366,7 @@ export default async function PlantioPage() {
     <div className="mx-auto w-full min-w-0 max-w-[1440px]">
       <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-[#244b49]">
-            Cultivo
-          </h1>
+          <h1 className="text-2xl font-bold text-[#244b49]">Cultivo</h1>
 
           <p className="mt-1 text-sm text-slate-500">
             Gerencie os plantios, a ocupação dos lotes e os registros.
@@ -436,8 +404,8 @@ export default async function PlantioPage() {
           }
           descricao={
             proximaColheita
-              ? proximaColheita.cultura?.nome_cultura ??
-                proximaColheita.produto.nome_produto
+              ? (proximaColheita.cultura?.nome_cultura ??
+                proximaColheita.produto.nome_produto)
               : "Sem previsão futura cadastrada"
           }
         />
@@ -472,8 +440,7 @@ export default async function PlantioPage() {
                 const total = Number(lote.area);
 
                 const ocupada = cultivos.reduce(
-                  (soma, plantio) =>
-                    soma + Number(plantio.area_plantada ?? 0),
+                  (soma, plantio) => soma + Number(plantio.area_plantada ?? 0),
                   0,
                 );
 
@@ -484,9 +451,7 @@ export default async function PlantioPage() {
                 const excesso = ocupada > total;
 
                 const percentual =
-                  total > 0
-                    ? Math.round((ocupada / total) * 100)
-                    : 0;
+                  total > 0 ? Math.round((ocupada / total) * 100) : 0;
 
                 return (
                   <article
@@ -520,10 +485,7 @@ export default async function PlantioPage() {
                     </div>
 
                     <dl className="mt-5 space-y-3 text-sm">
-                      <Info
-                        titulo="Área total"
-                        valor={`${numero(total)} ha`}
-                      />
+                      <Info titulo="Área total" valor={`${numero(total)} ha`} />
                       <Info
                         titulo={
                           areaPendente
@@ -657,28 +619,18 @@ function Indicador({
 }) {
   return (
     <article className="min-w-0 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-slate-500">
-        {titulo}
-      </p>
+      <p className="text-sm font-medium text-slate-500">{titulo}</p>
 
       <p className="mt-3 break-words text-2xl font-bold text-[#244b49]">
         {valor}
       </p>
 
-      <p className="mt-3 text-xs text-slate-500">
-        {descricao}
-      </p>
+      <p className="mt-3 text-xs text-slate-500">{descricao}</p>
     </article>
   );
 }
 
-function Info({
-  titulo,
-  valor,
-}: {
-  titulo: string;
-  valor: string;
-}) {
+function Info({ titulo, valor }: { titulo: string; valor: string }) {
   return (
     <div className="flex items-start justify-between gap-4">
       <dt className="text-slate-500">{titulo}</dt>
@@ -699,11 +651,7 @@ function Vazio({ texto }: { texto: string }) {
 
 function ListaEventos({ eventos }: { eventos: Evento[] }) {
   if (eventos.length === 0) {
-    return (
-      <p className="text-sm text-slate-500">
-        Nenhum evento registrado.
-      </p>
-    );
+    return <p className="text-sm text-slate-500">Nenhum evento registrado.</p>;
   }
 
   return (
@@ -714,9 +662,7 @@ function ListaEventos({ eventos }: { eventos: Evento[] }) {
           className="rounded-lg border border-slate-100 bg-slate-50 p-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <strong className="text-sm text-[#244b49]">
-              {evento.tipo}
-            </strong>
+            <strong className="text-sm text-[#244b49]">{evento.tipo}</strong>
 
             <span className="text-xs text-slate-500">
               {dataFormatada(evento.data)}
@@ -724,8 +670,7 @@ function ListaEventos({ eventos }: { eventos: Evento[] }) {
           </div>
 
           <p className="mt-2 text-sm text-slate-700">
-            {evento.cultura} · {evento.lote} · Plantio #
-            {evento.idPlantio}
+            {evento.cultura} · {evento.lote} · Plantio #{evento.idPlantio}
           </p>
 
           <p className="mt-1 text-sm font-semibold text-slate-800">

@@ -1,8 +1,122 @@
 import { prisma } from "@/app/lib/prisma";
 
+class ErroValidacao extends Error {
+  constructor(
+    mensagem: string,
+    public status = 400,
+  ) {
+    super(mensagem);
+  }
+}
+
+const CATEGORIAS = [
+  "Alimentação",
+  "Fertilizante",
+  "Semente",
+  "Produto colhido",
+  "Vacina",
+  "Medicamento",
+  "Ferramenta",
+  "Outro",
+];
+
+const UNIDADES: Record<string, string> = {
+  KG: "KG",
+  G: "G",
+  L: "L",
+  ML: "ML",
+  UNIDADE: "Unidade",
+  SACA: "Saca",
+  DOSE: "Dose",
+};
+
+function lerQuantidade(
+  valor: unknown,
+  campo: string,
+): string {
+  if (
+    typeof valor !== "string" &&
+    typeof valor !== "number"
+  ) {
+    throw new ErroValidacao(`Informe ${campo}.`);
+  }
+
+  const texto = String(valor).trim();
+
+  if (!/^\d{1,8}(\.\d{1,2})?$/.test(texto)) {
+    throw new ErroValidacao(
+      `${campo} deve estar entre 0 e 99.999.999,99, com até duas casas decimais.`,
+    );
+  }
+
+  const [inteiro, fracao = ""] = texto.split(".");
+
+  return `${Number(inteiro)}.${fracao.padEnd(2, "0")}`;
+}
+
+function responderErro(error: unknown) {
+  if (error instanceof ErroValidacao) {
+    return Response.json(
+      { error: error.message },
+      { status: error.status },
+    );
+  }
+
+  console.error("Erro na API de produtos:", error);
+
+  return Response.json(
+    { error: "Não foi possível processar a solicitação." },
+    { status: 500 },
+  );
+}
+
+// O modal consulta as culturas sem precisar alterar
+// as propriedades recebidas pela página de estoque.
+export async function GET() {
+  try {
+    const culturas = await prisma.cultura.findMany({
+      where: {
+        ativo: true,
+      },
+      select: {
+        id_cultura: true,
+        nome_cultura: true,
+      },
+      orderBy: {
+        nome_cultura: "asc",
+      },
+    });
+
+    return Response.json(
+      { culturas },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  } catch (error) {
+    return responderErro(error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    const dados = await request.json();
+    const dados = await request.json().catch(() => {
+      throw new ErroValidacao(
+        "Os dados enviados são inválidos.",
+      );
+    });
+
+    if (
+      !dados ||
+      typeof dados !== "object" ||
+      Array.isArray(dados)
+    ) {
+      throw new ErroValidacao(
+        "Os dados enviados são inválidos.",
+      );
+    }
 
     const nome =
       typeof dados.nome === "string"
@@ -14,94 +128,191 @@ export async function POST(request: Request) {
         ? dados.categoria.trim()
         : "";
 
-    const unidadeMedida =
+    const unidadeInformada =
       typeof dados.unidadeMedida === "string"
-        ? dados.unidadeMedida.trim()
+        ? dados.unidadeMedida.trim().toUpperCase()
         : "";
 
-    const quantidade = Number(dados.quantidade);
-    const estoqueMinimo = Number(dados.estoqueMinimo);
+    if (!nome || nome.length > 100) {
+      throw new ErroValidacao(
+        "O nome do produto deve ter entre 1 e 100 caracteres.",
+      );
+    }
 
-    if (!nome || !categoria || !unidadeMedida) {
-      return Response.json(
-        {
-          error:
-            "Nome, categoria e unidade de medida são obrigatórios.",
-        },
-        {
-          status: 400,
-        },
+    if (!CATEGORIAS.includes(categoria)) {
+      throw new ErroValidacao(
+        "Selecione uma categoria válida.",
       );
     }
 
     if (
-      !Number.isFinite(quantidade) ||
-      !Number.isFinite(estoqueMinimo) ||
-      quantidade < 0 ||
-      estoqueMinimo < 0
+      !Object.prototype.hasOwnProperty.call(
+        UNIDADES,
+        unidadeInformada,
+      )
     ) {
-      return Response.json(
-        {
-          error:
-            "As quantidades precisam ser números maiores ou iguais a zero.",
-        },
-        {
-          status: 400,
-        },
+      throw new ErroValidacao(
+        "Selecione uma unidade de medida válida.",
       );
     }
 
-    const produtoExistente =
-      await prisma.produto.findFirst({
-        where: {
-          nome_produto: {
-            equals: nome,
-            mode: "insensitive",
-          },
-        },
-      });
+    const unidadeMedida = UNIDADES[unidadeInformada];
 
-    if (produtoExistente) {
-      return Response.json(
-        {
-          error:
+    const quantidade = lerQuantidade(
+      dados.quantidade,
+      "a quantidade inicial",
+    );
+
+    const estoqueMinimo = lerQuantidade(
+      dados.estoqueMinimo,
+      "o estoque mínimo",
+    );
+
+    const exigeCultura =
+      categoria === "Semente" ||
+      categoria === "Produto colhido";
+
+    let idCultura: number | null = null;
+
+    if (exigeCultura) {
+      if (
+        typeof dados.idCultura !== "string" &&
+        typeof dados.idCultura !== "number"
+      ) {
+        throw new ErroValidacao(
+          "Selecione a cultura correspondente ao produto.",
+        );
+      }
+
+      idCultura = Number(dados.idCultura);
+
+      if (
+        !Number.isSafeInteger(idCultura) ||
+        idCultura <= 0
+      ) {
+        throw new ErroValidacao(
+          "Selecione uma cultura válida.",
+        );
+      }
+    } else if (
+      dados.idCultura !== undefined &&
+      dados.idCultura !== null &&
+      dados.idCultura !== ""
+    ) {
+      throw new ErroValidacao(
+        "O vínculo com cultura está disponível para sementes e produtos colhidos.",
+      );
+    }
+
+    if (
+      categoria === "Semente" &&
+      !["KG", "SACA", "UNIDADE"].includes(
+        unidadeInformada,
+      )
+    ) {
+      throw new ErroValidacao(
+        "Cadastre sementes em kg, sacas ou unidades.",
+      );
+    }
+
+    if (
+      categoria === "Produto colhido" &&
+      unidadeInformada !== "KG"
+    ) {
+      throw new ErroValidacao(
+        "O produto colhido deve ser cadastrado em kg. As colheitas informadas em toneladas serão convertidas para kg.",
+      );
+    }
+
+    const produto = await prisma.$transaction(
+      async (tx) => {
+        if (idCultura !== null) {
+          const cultura = await tx.cultura.findUnique({
+            where: {
+              id_cultura: idCultura,
+            },
+          });
+
+          if (!cultura || !cultura.ativo) {
+            throw new ErroValidacao(
+              "Selecione uma cultura ativa.",
+            );
+          }
+        }
+
+        const produtoExistente =
+          await tx.produto.findFirst({
+            where: {
+              nome_produto: {
+                equals: nome,
+                mode: "insensitive",
+              },
+            },
+          });
+
+        if (produtoExistente) {
+          throw new ErroValidacao(
             "Já existe um produto cadastrado com esse nome.",
-        },
-        {
-          status: 409,
-        },
-      );
-    }
+            409,
+          );
+        }
 
-    const produto = await prisma.produto.create({
-      data: {
-        nome_produto: nome,
-        categoria,
-        quantidade: quantidade.toString(),
-        estoque_min: estoqueMinimo.toString(),
-        unidade_medida: unidadeMedida,
+        // Mantém compatibilidade com a API de colheitas:
+        // categoria Outro + cultura vinculada + unidade KG.
+        const categoriaBanco =
+          categoria === "Produto colhido"
+            ? "Outro"
+            : categoria;
+
+        const novoProduto = await tx.produto.create({
+          data: {
+            nome_produto: nome,
+            categoria: categoriaBanco,
+            quantidade,
+            estoque_min: estoqueMinimo,
+            unidade_medida: unidadeMedida,
+            id_cultura: idCultura,
+          },
+        });
+
+        // O saldo inicial positivo também aparece no histórico.
+        if (quantidade !== "0.00") {
+          const usuario = await tx.usuarios.findFirst({
+            orderBy: {
+              id_usuario: "asc",
+            },
+          });
+
+          if (!usuario) {
+            throw new ErroValidacao(
+              "Cadastre um usuário antes de informar um saldo inicial.",
+            );
+          }
+
+          await tx.move_estoque.create({
+            data: {
+              id_produto: novoProduto.id_produto,
+              tipo_movimento: "ENTRADA",
+              quantidade_move: quantidade,
+              observacao:
+                "Saldo inicial informado no cadastro do produto.",
+              id_usuario: usuario.id_usuario,
+            },
+          });
+        }
+
+        return novoProduto;
       },
-    });
+    );
 
     return Response.json(
       {
         message: "Produto cadastrado com sucesso.",
         produto,
       },
-      {
-        status: 201,
-      },
+      { status: 201 },
     );
   } catch (error) {
-    console.error("Erro ao cadastrar produto:", error);
-
-    return Response.json(
-      {
-        error: "Não foi possível cadastrar o produto.",
-      },
-      {
-        status: 500,
-      },
-    );
+    return responderErro(error);
   }
 }
