@@ -21,12 +21,15 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-dvh bg-slate-100">
-      <Sidebar />
+      <Sidebar
+        usuario={{
+          nome: usuario.nome_usuario,
+          permissao: usuario.permissao_usuario,
+        }}
+      />
 
       <div className="min-w-0 md:pl-60">
-        <main className="w-full min-w-0 p-4 sm:p-6">
-          {children}
-        </main>
+        <main className="w-full min-w-0 p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );
