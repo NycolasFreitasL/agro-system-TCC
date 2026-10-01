@@ -6,7 +6,6 @@ import { prisma } from "@/app/lib/prisma";
 
 const NOME_COOKIE = "agrosystem_sessao";
 const DURACAO_SEGUNDOS = 8 * 60 * 60;
-
 const EMISSOR = "agrosystem";
 const DESTINATARIO = "agrosystem-web";
 
@@ -24,30 +23,62 @@ function obterChave() {
 
 export class ErroAutenticacao extends Error {
   constructor(
-    mensagem = "Sua sessão expirou. Entre novamente.",
+    mensagem = "Sua sessão expirou ou seu acesso foi desativado. Entre novamente.",
     public status = 401,
   ) {
     super(mensagem);
+    this.name = "ErroAutenticacao";
   }
 }
 
-export async function criarSessao(idUsuario: number) {
+export async function criarSessao(
+  idUsuario: number,
+  versaoEsperada?: number,
+) {
   if (!Number.isSafeInteger(idUsuario) || idUsuario <= 0) {
-    throw new Error("Identificador de usuário inválido.");
+    throw new ErroAutenticacao();
   }
 
-  const token = await new SignJWT({})
+  const usuario = await prisma.usuarios.findUnique({
+    where: {
+      id_usuario: idUsuario,
+    },
+    select: {
+      id_usuario: true,
+      versao_sessao: true,
+      ativo: true,
+    },
+  });
+
+  if (!usuario || !usuario.ativo) {
+    throw new ErroAutenticacao();
+  }
+
+  // Evita criar uma sessão caso a senha ou o acesso
+  // tenham mudado durante a autenticação.
+  if (
+    versaoEsperada !== undefined &&
+    usuario.versao_sessao !== versaoEsperada
+  ) {
+    throw new ErroAutenticacao(
+      "Os dados de acesso foram alterados. Entre novamente.",
+    );
+  }
+
+  const token = await new SignJWT({
+    versao: usuario.versao_sessao,
+  })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(String(idUsuario))
+    .setSubject(String(usuario.id_usuario))
     .setIssuer(EMISSOR)
     .setAudience(DESTINATARIO)
     .setIssuedAt()
     .setExpirationTime("8h")
     .sign(obterChave());
 
-  const cookieStore = await cookies();
+  const armazenamento = await cookies();
 
-  cookieStore.set(NOME_COOKIE, token, {
+  armazenamento.set(NOME_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -57,9 +88,9 @@ export async function criarSessao(idUsuario: number) {
 }
 
 export async function encerrarSessao() {
-  const cookieStore = await cookies();
+  const armazenamento = await cookies();
 
-  cookieStore.set(NOME_COOKIE, "", {
+  armazenamento.set(NOME_COOKIE, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -69,17 +100,17 @@ export async function encerrarSessao() {
 }
 
 export async function obterUsuarioAtual() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(NOME_COOKIE)?.value;
+  const armazenamento = await cookies();
+  const token = armazenamento.get(NOME_COOKIE)?.value;
 
   if (!token) {
     return null;
   }
 
-  // Erro de configuração não deve ser confundido com sessão expirada.
   const chave = obterChave();
 
   let idUsuario: number;
+  let versaoSessao: number;
 
   try {
     const { payload } = await jwtVerify(token, chave, {
@@ -99,14 +130,27 @@ export async function obterUsuarioAtual() {
 
     idUsuario = Number(payload.sub);
 
-    if (!Number.isSafeInteger(idUsuario) || idUsuario <= 0) {
+    if (
+      !Number.isSafeInteger(idUsuario) ||
+      idUsuario <= 0
+    ) {
       return null;
     }
+
+    if (
+      typeof payload.versao !== "number" ||
+      !Number.isSafeInteger(payload.versao) ||
+      payload.versao < 0
+    ) {
+      return null;
+    }
+
+    versaoSessao = payload.versao;
   } catch {
     return null;
   }
 
-  return prisma.usuarios.findUnique({
+  const usuario = await prisma.usuarios.findUnique({
     where: {
       id_usuario: idUsuario,
     },
@@ -116,8 +160,26 @@ export async function obterUsuarioAtual() {
       email: true,
       permissao_usuario: true,
       foto_perfil: true,
+      versao_sessao: true,
+      ativo: true,
     },
   });
+
+  if (
+    !usuario ||
+    !usuario.ativo ||
+    usuario.versao_sessao !== versaoSessao
+  ) {
+    return null;
+  }
+
+  return {
+    id_usuario: usuario.id_usuario,
+    nome_usuario: usuario.nome_usuario,
+    email: usuario.email,
+    permissao_usuario: usuario.permissao_usuario,
+    foto_perfil: usuario.foto_perfil,
+  };
 }
 
 export async function exigirUsuario() {
@@ -135,7 +197,7 @@ export async function exigirProprietario() {
 
   if (usuario.permissao_usuario !== "PROPRIETARIO") {
     throw new ErroAutenticacao(
-      "Somente o proprietário pode administrar os dados da fazenda.",
+      "Somente o proprietário pode realizar esta operação.",
       403,
     );
   }

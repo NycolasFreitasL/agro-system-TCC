@@ -1,12 +1,8 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
-import Sidebar from "../components/sidebar";
+import Sidebar from "@/app/components/sidebar";
 import { obterUsuarioAtual } from "@/app/lib/sessao";
-
-// Use "/" se a tela de login estiver em app/page.tsx.
-// Use "/login" se estiver em app/login/page.tsx.
-const PAGINA_LOGIN = "/login";
 
 export default async function DashboardLayout({
   children,
@@ -16,7 +12,7 @@ export default async function DashboardLayout({
   const usuario = await obterUsuarioAtual();
 
   if (!usuario) {
-    redirect(PAGINA_LOGIN);
+    redirect("/login");
   }
 
   return (
@@ -25,11 +21,14 @@ export default async function DashboardLayout({
         usuario={{
           nome: usuario.nome_usuario,
           permissao: usuario.permissao_usuario,
+          foto: usuario.foto_perfil,
         }}
       />
 
       <div className="min-w-0 md:pl-60">
-        <main className="w-full min-w-0 p-4 sm:p-6">{children}</main>
+        <main className="w-full min-w-0 p-4 sm:p-6">
+          {children}
+        </main>
       </div>
     </div>
   );

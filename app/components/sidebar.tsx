@@ -1,13 +1,10 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 type IconeNome =
   | "dashboard"
@@ -15,22 +12,25 @@ type IconeNome =
   | "cultivo"
   | "estoque"
   | "fazenda"
+  | "perfil"
+  | "configuracoes"
   | "sair";
-
-type ItemMenu = {
-  href: string;
-  titulo: string;
-  icone: IconeNome;
-};
 
 type SidebarProps = {
   usuario: {
     nome: string;
     permissao: string;
+    foto?: string | null;
   };
 };
 
-const itensPrincipais: ItemMenu[] = [
+type Item = {
+  href: string;
+  titulo: string;
+  icone: IconeNome;
+};
+
+const itens: Item[] = [
   {
     href: "/dashboard",
     titulo: "Dashboard",
@@ -53,29 +53,23 @@ const itensPrincipais: ItemMenu[] = [
   },
 ];
 
-export default function Sidebar({
-  usuario,
-}: SidebarProps) {
+export default function Sidebar({ usuario }: SidebarProps) {
   const pathname = usePathname();
+  const navegacaoId = useId();
+  const botaoRef = useRef<HTMLButtonElement>(null);
+  const saindoRef = useRef(false);
 
   const [menuAberto, setMenuAberto] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const [erro, setErro] = useState("");
 
-  const botaoRef = useRef<HTMLButtonElement>(null);
-  const saindoRef = useRef(false);
-  const navegacaoId = useId();
+  const proprietario = usuario.permissao === "PROPRIETARIO";
 
-  const proprietario =
-    usuario.permissao === "PROPRIETARIO";
-
-  const iniciais = usuario.nome
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((parte) => parte.charAt(0))
-    .join("")
-    .toUpperCase();
+  const permissao = proprietario
+    ? "Proprietário"
+    : usuario.permissao === "FUNCIONARIO"
+      ? "Funcionário"
+      : usuario.permissao;
 
   useEffect(() => {
     if (!menuAberto) return;
@@ -107,20 +101,13 @@ export default function Sidebar({
       });
 
       if (!resposta.ok) {
-        const dados = await resposta.json().catch(() => null);
-
-        throw new Error(
-          dados?.error || "Não foi possível sair.",
-        );
+        throw new Error("Não foi possível sair. Tente novamente.");
       }
 
-      // Navegação completa para descartar o estado da área autenticada.
       window.location.replace("/login");
     } catch (error) {
       setErro(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível sair. Tente novamente.",
+        error instanceof Error ? error.message : "Não foi possível sair.",
       );
 
       saindoRef.current = false;
@@ -128,10 +115,9 @@ export default function Sidebar({
     }
   }
 
-  function renderizarItem(item: ItemMenu) {
+  function linkMenu(item: Item) {
     const ativo =
-      pathname === item.href ||
-      pathname.startsWith(`${item.href}/`);
+      pathname === item.href || pathname.startsWith(`${item.href}/`);
 
     return (
       <li key={item.href}>
@@ -139,15 +125,11 @@ export default function Sidebar({
           href={item.href}
           aria-current={ativo ? "page" : undefined}
           onClick={() => setMenuAberto(false)}
-          className={
-            "flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 " +
-            "text-sm font-semibold transition-colors " +
-            "focus-visible:outline-2 focus-visible:outline-offset-2 " +
-            "focus-visible:outline-[#486d6b] " +
-            (ativo
+          className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] ${
+            ativo
               ? "bg-[#486d6b] text-white"
-              : "text-slate-600 hover:bg-[#edf4f3] hover:text-[#244b49]")
-          }
+              : "text-slate-600 hover:bg-[#edf4f3] hover:text-[#244b49]"
+          }`}
         >
           <Icone nome={item.icone} />
           <span>{item.titulo}</span>
@@ -202,22 +184,16 @@ export default function Sidebar({
 
       <div
         id={navegacaoId}
-        className={
-          "min-h-0 overflow-y-auto md:flex md:flex-1 md:flex-col " +
-          (menuAberto ? "flex flex-col" : "hidden")
-        }
+        className={`min-h-0 overflow-y-auto ${
+          menuAberto ? "flex flex-col" : "hidden"
+        } md:flex md:flex-1 md:flex-col`}
       >
-        <nav
-          aria-label="Navegação principal"
-          className="px-3 pb-5 md:flex-1"
-        >
+        <nav aria-label="Navegação principal" className="px-3 pb-5 md:flex-1">
           <p className="mb-3 px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
             Gestão da propriedade
           </p>
 
-          <ul className="space-y-2">
-            {itensPrincipais.map(renderizarItem)}
-          </ul>
+          <ul className="space-y-2">{itens.map(linkMenu)}</ul>
 
           {proprietario && (
             <>
@@ -226,7 +202,7 @@ export default function Sidebar({
               </p>
 
               <ul className="space-y-2">
-                {renderizarItem({
+                {linkMenu({
                   href: "/fazenda",
                   titulo: "Fazenda",
                   icone: "fazenda",
@@ -234,16 +210,37 @@ export default function Sidebar({
               </ul>
             </>
           )}
+
+          <p className="mb-3 mt-7 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Minha conta
+          </p>
+
+          <ul className="space-y-2">
+            {linkMenu({
+              href: "/perfil",
+              titulo: "Meu perfil",
+              icone: "perfil",
+            })}
+
+            {linkMenu({
+              href: "/configuracoes",
+              titulo: "Configurações",
+              icone: "configuracoes",
+            })}
+          </ul>
         </nav>
 
         <footer className="shrink-0 border-t border-slate-100 p-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div
-              aria-hidden="true"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#486d6b]/10 text-sm font-bold text-[#486d6b]"
-            >
-              {iniciais || "U"}
-            </div>
+          <Link
+            href="/perfil"
+            onClick={() => setMenuAberto(false)}
+            className="flex min-w-0 items-center gap-3 rounded-lg p-2 transition hover:bg-[#edf4f3] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b]"
+          >
+            <Avatar
+              key={usuario.foto || "sem-foto"}
+              nome={usuario.nome}
+              foto={usuario.foto}
+            />
 
             <div className="min-w-0">
               <p
@@ -253,37 +250,59 @@ export default function Sidebar({
                 {usuario.nome}
               </p>
 
-              <p className="mt-0.5 text-xs text-slate-500">
-                {proprietario
-                  ? "Proprietário"
-                  : usuario.permissao === "FUNCIONARIO"
-                    ? "Funcionário"
-                    : usuario.permissao}
-              </p>
+              <p className="mt-1 text-xs text-slate-500">{permissao}</p>
             </div>
-          </div>
-
-          {erro && (
-            <p
-              role="alert"
-              className="mt-3 rounded-lg bg-red-50 p-3 text-xs text-red-700"
-            >
-              {erro}
-            </p>
-          )}
+          </Link>
 
           <button
             type="button"
             onClick={sair}
             disabled={saindo}
-            className="mt-4 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] disabled:cursor-wait disabled:opacity-50"
+            className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] disabled:cursor-wait disabled:opacity-60"
           >
             <Icone nome="sair" />
             {saindo ? "Saindo..." : "Sair"}
           </button>
+
+          {erro && (
+            <p
+              role="alert"
+              className="mt-2 rounded-lg bg-red-50 p-3 text-xs text-red-700"
+            >
+              {erro}
+            </p>
+          )}
         </footer>
       </div>
     </aside>
+  );
+}
+
+function Avatar({ nome, foto }: { nome: string; foto?: string | null }) {
+  const [falhou, setFalhou] = useState(false);
+
+  const iniciais = nome
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte.charAt(0))
+    .join("")
+    .toUpperCase();
+
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e8f0ef] text-sm font-bold text-[#244b49]">
+      {foto && !falhou ? (
+        <img
+          src={foto}
+          alt=""
+          onError={() => setFalhou(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        iniciais || "U"
+      )}
+    </span>
   );
 }
 
@@ -338,15 +357,30 @@ function Icone({ nome }: { nome: IconeNome }) {
       {nome === "fazenda" && (
         <>
           <path d="m3 10 9-7 9 7" />
-          <path d="M5 9v12h14V9" />
-          <path d="M9 21v-8h6v8M3 21h18" />
+          <path d="M5 9v12h14V9M9 21v-8h6v8" />
+          <path d="m9 13 6 8m0-8-6 8" />
+        </>
+      )}
+
+      {nome === "perfil" && (
+        <>
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
+        </>
+      )}
+      
+      {nome === "configuracoes" && (
+        <>
+          <path d="M4 7h16M4 17h16" />
+          <rect x="7" y="4" width="4" height="6" rx="1" />
+          <rect x="14" y="14" width="4" height="6" rx="1" />
         </>
       )}
 
       {nome === "sair" && (
         <>
-          <path d="M9 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4" />
-          <path d="M9 12h12m-4-4 4 4-4 4" />
+          <path d="M9 5H5v14h4M10 12h11" />
+          <path d="m17 8 4 4-4 4" />
         </>
       )}
     </svg>

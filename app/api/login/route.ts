@@ -1,8 +1,23 @@
-import { prisma } from "@/app/lib/prisma";
-import { criarSessao } from "@/app/lib/sessao";
 import bcrypt from "bcrypt";
+import { prisma } from "@/app/lib/prisma";
+import {
+  criarSessao,
+  ErroAutenticacao,
+} from "@/app/lib/sessao";
 
 export const runtime = "nodejs";
+
+function responderErro(mensagem: string, status: number) {
+  return Response.json(
+    { error: mensagem },
+    {
+      status,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -13,51 +28,64 @@ export async function POST(request: Request) {
       typeof dados !== "object" ||
       Array.isArray(dados)
     ) {
-      return Response.json(
-        { error: "Os dados enviados são inválidos." },
-        { status: 400 },
-      );
+      return responderErro("Os dados enviados são inválidos.", 400);
     }
 
     const email =
       typeof dados.email === "string"
-        ? dados.email.trim()
+        ? dados.email.trim().toLowerCase()
         : "";
 
+    // Mantém "password", utilizado pelo formulário de login.
     const password =
       typeof dados.password === "string"
         ? dados.password
         : "";
 
     if (!email || !password) {
-      return Response.json(
-        { error: "E-mail e senha são obrigatórios." },
-        { status: 400 },
-      );
+      return responderErro("E-mail e senha são obrigatórios.", 400);
     }
 
-    if (email.length > 150 || password.length > 250) {
-      return Response.json(
-        { error: "E-mail ou senha inválidos." },
-        { status: 400 },
-      );
+    if (
+      email.length > 150 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      Buffer.byteLength(password, "utf8") > 72
+    ) {
+      return responderErro("E-mail ou senha inválidos.", 400);
     }
 
-    const usuario = await prisma.usuarios.findUnique({
+    // Aceita e-mails antigos com letras maiúsculas.
+    // Se houver duplicidade por diferença de maiúsculas,
+    // não escolhe uma conta arbitrariamente.
+    const encontrados = await prisma.usuarios.findMany({
       where: {
-        email,
+        email: {
+          equals: email,
+          mode: "insensitive",
+        },
       },
       select: {
         id_usuario: true,
         senha: true,
+        ativo: true,
+        versao_sessao: true,
       },
+      take: 2,
     });
 
-    // A resposta não revela se o e-mail está cadastrado.
-    if (!usuario) {
-      return Response.json(
-        { error: "E-mail ou senha incorretos." },
-        { status: 401 },
+    if (encontrados.length !== 1) {
+      return responderErro(
+        "E-mail ou senha incorretos, ou acesso indisponível.",
+        401,
+      );
+    }
+
+    const usuario = encontrados[0];
+
+    if (!usuario.ativo) {
+      return responderErro(
+        "E-mail ou senha incorretos, ou acesso indisponível.",
+        401,
       );
     }
 
@@ -67,13 +95,16 @@ export async function POST(request: Request) {
     );
 
     if (!senhaCorreta) {
-      return Response.json(
-        { error: "E-mail ou senha incorretos." },
-        { status: 401 },
+      return responderErro(
+        "E-mail ou senha incorretos, ou acesso indisponível.",
+        401,
       );
     }
 
-    await criarSessao(usuario.id_usuario);
+    await criarSessao(
+      usuario.id_usuario,
+      usuario.versao_sessao,
+    );
 
     return Response.json(
       { message: "Login bem-sucedido." },
@@ -84,11 +115,15 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (error instanceof ErroAutenticacao) {
+      return responderErro(error.message, error.status);
+    }
+
     console.error("Erro ao realizar login:", error);
 
-    return Response.json(
-      { error: "Não foi possível entrar. Tente novamente." },
-      { status: 500 },
+    return responderErro(
+      "Não foi possível entrar. Tente novamente.",
+      500,
     );
   }
 }

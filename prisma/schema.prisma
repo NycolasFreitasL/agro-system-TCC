@@ -164,6 +164,8 @@ model usuarios {
   nome_usuario      String         @db.VarChar(100)
   email             String         @unique(map: "uq_usuario_email") @db.VarChar(150)
   senha             String         @db.VarChar(250)
+  versao_sessao     Int            @default(0)
+  ativo             Boolean        @default(true)
   permissao_usuario String         @default("FUNCIONARIO") @db.VarChar(20)
   criado_em         DateTime?      @default(now()) @db.Timestamptz(6)
   foto_perfil       String?        @db.VarChar(255)
@@ -179,17 +181,17 @@ model usuarios {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model vacinacao {
-  id_vacina   Int      @id(map: "pk_vacinacao") @default(autoincrement())
-  id_animal   Int
-  id_produto  Int
-  data_vacina DateTime @db.Date
-  dose_vacina Decimal? @db.Decimal(5, 2)
-  unidade_dose String? @db.VarChar(20)
-  observacao  String?  @db.VarChar(255)
-  id_usuario  Int
-  animal      animal   @relation(fields: [id_animal], references: [id_animal], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_animal")
-  produto     produto  @relation(fields: [id_produto], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_produto")
-  usuarios    usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_usuario")
+  id_vacina    Int      @id(map: "pk_vacinacao") @default(autoincrement())
+  id_animal    Int
+  id_produto   Int
+  data_vacina  DateTime @db.Date
+  dose_vacina  Decimal? @db.Decimal(5, 2)
+  unidade_dose String?  @db.VarChar(20)
+  observacao   String?  @db.VarChar(255)
+  id_usuario   Int
+  animal       animal   @relation(fields: [id_animal], references: [id_animal], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_animal")
+  produto      produto  @relation(fields: [id_produto], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_produto")
+  usuarios     usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_usuario")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
