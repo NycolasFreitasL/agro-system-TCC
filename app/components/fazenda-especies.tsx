@@ -14,10 +14,7 @@ type Especie = {
   animais: number;
 };
 
-const estiloCampo =
-  "mt-2 w-full rounded-xl border border-slate-300 bg-white " +
-  "px-3 py-2.5 text-sm outline-none focus:border-[#486d6b] " +
-  "focus:ring-2 focus:ring-[#486d6b]/15";
+const estiloCampo = "input mt-2";
 
 export default function FazendaEspecies({
   especies,
@@ -126,7 +123,7 @@ export default function FazendaEspecies({
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
-          <h2 className="font-bold text-[#123e40]">
+          <h2 className="font-bold text-[#244b49]">
             Espécies de animais
           </h2>
 
@@ -139,7 +136,7 @@ export default function FazendaEspecies({
           type="button"
           onClick={() => abrirFormulario()}
           disabled={salvando || formularioAberto}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:opacity-50"
         >
           <svg
             viewBox="0 0 24 24"
@@ -162,7 +159,7 @@ export default function FazendaEspecies({
             aria-busy={salvando}
             className="rounded-xl border border-slate-200 bg-slate-50 p-4"
           >
-            <h3 className="font-semibold text-[#123e40]">
+            <h3 className="font-semibold text-[#244b49]">
               {editandoId === null
                 ? "Cadastrar espécie"
                 : "Editar espécie"}
@@ -226,7 +223,7 @@ export default function FazendaEspecies({
               <button
                 type="submit"
                 disabled={salvando}
-                className="rounded-lg bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:opacity-50"
+                className="rounded-lg bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:opacity-50"
               >
                 {salvando ? "Salvando..." : "Salvar espécie"}
               </button>
@@ -253,7 +250,7 @@ export default function FazendaEspecies({
         )}
 
         {especies.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">
+          <p className="estado-vazio">
             Nenhuma espécie cadastrada.
           </p>
         ) : (
@@ -273,7 +270,7 @@ export default function FazendaEspecies({
                       className={
                         "rounded-full px-2.5 py-1 text-xs font-medium " +
                         (especie.status === "ATIVO"
-                          ? "bg-[#486d6b]/10 text-[#365452]"
+                          ? "bg-[#486d6b]/10 text-[#244b49]"
                           : "bg-slate-100 text-slate-500")
                       }
                     >
@@ -290,7 +287,7 @@ export default function FazendaEspecies({
                   </p>
                 </div>
 
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => abrirFormulario(especie)}

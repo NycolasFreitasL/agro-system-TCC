@@ -49,11 +49,7 @@ const ESTADOS = [
   ["TO", "Tocantins"],
 ];
 
-const estiloCampo =
-  "mt-2 w-full min-w-0 rounded-xl border border-slate-300 " +
-  "bg-white px-4 py-3 text-sm text-slate-800 outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15 " +
-  "disabled:bg-slate-50 disabled:text-slate-500";
+const estiloCampo = "input mt-2";
 
 export default function FazendaFormulario({
   fazenda,
@@ -129,7 +125,7 @@ export default function FazendaFormulario({
   return (
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <header className="border-b border-slate-100 p-5 sm:p-6">
-        <h2 className="font-bold text-[#123e40]">
+        <h2 className="font-bold text-[#244b49]">
           Dados da propriedade
         </h2>
 
@@ -258,7 +254,7 @@ export default function FazendaFormulario({
           <button
             type="submit"
             disabled={salvando}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#365452] disabled:cursor-wait disabled:opacity-60"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#244b49] disabled:cursor-wait disabled:opacity-60"
           >
             <svg
               viewBox="0 0 24 24"

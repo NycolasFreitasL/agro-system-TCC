@@ -9,6 +9,8 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { quantidadeInteira, usaDose } from "@/app/lib/estoque-regras";
+import UiIcon from "@/app/components/ui-icon";
 
 type Cultura = {
   id_cultura: number;
@@ -45,9 +47,12 @@ const UNIDADES = [
 export default function ProdutoModal() {
   const router = useRouter();
   const tituloId = useId();
+  const descricaoId = useId();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const enviandoRef = useRef(false);
+  const botaoRef = useRef<HTMLButtonElement>(null);
+  const nomeRef = useRef<HTMLInputElement>(null);
 
   const [modalAberto, setModalAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
@@ -64,6 +69,7 @@ export default function ProdutoModal() {
     categoria === "Semente" || categoria === "Produto colhido";
 
   const unidadesDisponiveis = UNIDADES.filter((item) => {
+    if (categoria === "Vacina") return item.valor === "DOSE";
     if (categoria === "Produto colhido") {
       return item.valor === "KG";
     }
@@ -104,6 +110,8 @@ export default function ProdutoModal() {
 
     if (novaCategoria === "Semente" || novaCategoria === "Produto colhido") {
       setUnidade("KG");
+    } else if (novaCategoria === "Vacina") {
+      setUnidade("DOSE");
     } else {
       setUnidade("");
     }
@@ -115,6 +123,7 @@ export default function ProdutoModal() {
     }
 
     const dialog = dialogRef.current;
+    const botao = botaoRef.current;
 
     if (!dialog) {
       return;
@@ -123,6 +132,8 @@ export default function ProdutoModal() {
     if (!dialog.open) {
       dialog.showModal();
     }
+
+    nomeRef.current?.focus();
 
     const overflowAnterior = document.body.style.overflow;
 
@@ -133,6 +144,10 @@ export default function ProdutoModal() {
 
       if (dialog.open) {
         dialog.close();
+      }
+
+      if (botao?.isConnected) {
+        botao.focus();
       }
     };
   }, [modalAberto]);
@@ -207,6 +222,13 @@ export default function ProdutoModal() {
     const formulario = event.currentTarget;
     const formData = new FormData(formulario);
 
+    if (usaDose(unidade) &&
+      (!quantidadeInteira(String(formData.get("quantidade"))) ||
+       !quantidadeInteira(String(formData.get("estoqueMinimo"))))) {
+      setErro("Quantidade inicial e estoque mínimo em Dose devem ser números inteiros não negativos.");
+      return;
+    }
+
     enviandoRef.current = true;
     setCarregando(true);
     setErro("");
@@ -253,56 +275,59 @@ export default function ProdutoModal() {
   return (
     <>
       <button
+        ref={botaoRef}
         type="button"
         onClick={abrirModal}
-        className="rounded-xl bg-[#486d6b] px-5 py-3 font-semibold text-white transition hover:bg-[#365553]"
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#244b49]"
       >
-        + Novo produto
+        <UiIcon nome="adicionar" />
+        Novo produto
       </button>
 
       <dialog
         ref={dialogRef}
         aria-labelledby={tituloId}
+        aria-describedby={descricaoId}
         onCancel={(event) => {
           event.preventDefault();
           fecharModal();
         }}
-        className="fixed inset-0 m-auto max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-2xl border-0 bg-white p-0 text-slate-900 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm"
+        onClose={() => {
+          if (!enviandoRef.current) setModalAberto(false);
+        }}
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[94vw] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/45"
       >
         {modalAberto && (
           <>
-            <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-5 sm:p-6">
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white p-4 sm:px-6 sm:py-5">
               <div className="min-w-0">
-                <p className="text-sm font-semibold uppercase tracking-wider text-[#486d6b]">
-                  Estoque
-                </p>
-
-                <h2 id={tituloId} className="mt-1 text-2xl font-bold">
-                  Cadastrar produto
+                <h2 id={tituloId} className="text-xl font-semibold text-[#244b49]">
+                  Novo produto
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Adicione um novo item ao estoque.
+                <p id={descricaoId} className="mt-1 text-sm text-slate-500">
+                  Defina o item, a unidade e o saldo inicial.
                 </p>
               </div>
 
               <button
                 type="button"
-                aria-label="Fechar modal"
+                aria-label="Fechar cadastro de produto"
                 onClick={fecharModal}
                 disabled={carregando}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
-                ×
+                <UiIcon nome="fechar" />
               </button>
             </header>
 
-            <form onSubmit={cadastrarProduto} className="p-5 sm:p-6">
+            <form onSubmit={cadastrarProduto} aria-busy={carregando} className="p-4 sm:p-6">
               <fieldset disabled={carregando} className="min-w-0">
-                <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="min-w-0 sm:col-span-2">
                     <Campo titulo="Nome do produto" obrigatorio>
                       <input
+                        ref={nomeRef}
                         name="nome"
                         required
                         maxLength={100}
@@ -402,16 +427,15 @@ export default function ProdutoModal() {
 
                       <p className="mt-2 text-sm text-slate-500">
                         {categoria === "Semente"
-                          ? "Essa cultura identifica o que será cultivado ao utilizar a semente no plantio."
-                          : "Esse produto poderá receber as colheitas dos plantios da cultura selecionada."}
+                          ? "Identifica a cultura dos plantios feitos com esta semente."
+                          : "Vincula este produto às colheitas da cultura selecionada."}
                       </p>
                     </div>
                   )}
 
                   {categoria === "Produto colhido" && (
-                    <div className="rounded-xl bg-green-50 p-4 text-sm text-green-900 sm:col-span-2">
-                      O estoque será controlado em kg. Colheitas informadas em
-                      toneladas serão convertidas automaticamente.
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 sm:col-span-2">
+                      Estoque em kg. Colheitas em toneladas são convertidas para kg.
                     </div>
                   )}
 
@@ -421,8 +445,8 @@ export default function ProdutoModal() {
                       type="number"
                       required
                       min="0"
-                      max="99999999.99"
-                      step="0.01"
+                      max={usaDose(unidade) ? "99999999" : "99999999.99"}
+                      step={usaDose(unidade) ? "1" : "0.01"}
                       defaultValue="0"
                       className="input w-full min-w-0"
                     />
@@ -434,36 +458,38 @@ export default function ProdutoModal() {
                       type="number"
                       required
                       min="0"
-                      max="99999999.99"
-                      step="0.01"
+                      max={usaDose(unidade) ? "99999999" : "99999999.99"}
+                      step={usaDose(unidade) ? "1" : "0.01"}
                       defaultValue="0"
                       className="input w-full min-w-0"
                     />
                   </Campo>
 
-                  <p className="text-sm text-slate-500 sm:col-span-2">
-                    A quantidade inicial representa o saldo que já existe no
-                    estoque. Se for maior que zero, será registrada uma entrada
-                    no histórico.
-                  </p>
+                  <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 sm:col-span-2">
+                    <p>O saldo inicial maior que zero gera uma entrada no histórico.</p>
+                    <p>O alerta considera o saldo no mínimo ou abaixo dele.</p>
+                    {usaDose(unidade) && (
+                      <p>Em Dose, saldo e mínimo devem ser inteiros. Não há conversão de ML para doses.</p>
+                    )}
+                  </div>
                 </div>
               </fieldset>
 
               {erro && (
                 <p
                   role="alert"
-                  className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700"
+                  className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700"
                 >
                   {erro}
                 </p>
               )}
 
-              <footer className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
+              <footer className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={fecharModal}
                   disabled={carregando}
-                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -471,7 +497,7 @@ export default function ProdutoModal() {
                 <button
                   type="submit"
                   disabled={carregando || culturaIndisponivel}
-                  className="rounded-xl bg-[#486d6b] px-6 py-3 font-semibold text-white hover:bg-[#365553] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-h-11 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {carregando ? "Cadastrando..." : "Cadastrar produto"}
                 </button>
@@ -486,14 +512,14 @@ export default function ProdutoModal() {
 
 function Campo({ titulo, obrigatorio = false, children }: CampoProps) {
   return (
-    <label className="block min-w-0">
-      <span className="text-sm font-semibold text-slate-700">
+    <label className="flex min-w-0 flex-col gap-1.5">
+      <span className="text-sm font-medium text-slate-700">
         {titulo}
 
-        {obrigatorio && <span className="ml-1 text-red-500">*</span>}
+        {obrigatorio && <span aria-hidden="true" className="ml-1 text-red-600">*</span>}
       </span>
 
-      <div className="mt-2">{children}</div>
+      {children}
     </label>
   );
 }

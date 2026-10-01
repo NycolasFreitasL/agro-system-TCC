@@ -16,10 +16,7 @@ type Props = {
   aoAlterarEnvio: (enviando: boolean) => void;
 };
 
-const estiloCampo =
-  "w-full min-w-0 rounded-xl border border-slate-300 bg-white " +
-  "px-3 py-2.5 text-sm outline-none focus:border-[#486d6b] " +
-  "focus:ring-2 focus:ring-[#486d6b]/15 disabled:bg-slate-100";
+const estiloCampo = "input";
 
 function numero(valor: string) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -45,6 +42,9 @@ export default function AnimalVacinacao({
   const [tentativa, setTentativa] = useState(0);
 
   const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [incompatibilidades, setIncompatibilidades] = useState<{
+    id: number; nome: string; motivo: string;
+  }[]>([]);
   const [idProduto, setIdProduto] = useState("");
   const [quantidade, setQuantidade] = useState("");
   const [data, setData] = useState("");
@@ -62,6 +62,7 @@ export default function AnimalVacinacao({
       setCarregando(true);
       setErro("");
       setProdutos([]);
+      setIncompatibilidades([]);
 
       try {
         const resposta = await fetch(
@@ -80,13 +81,14 @@ export default function AnimalVacinacao({
           );
         }
 
-        if (!Array.isArray(dados?.produtos) || typeof dados.hoje !== "string") {
+        if (!Array.isArray(dados?.produtos) || !Array.isArray(dados.incompatibilidades) || typeof dados.hoje !== "string") {
           throw new Error("O servidor retornou dados inválidos.");
         }
 
         if (controlador.signal.aborted) return;
 
         setProdutos(dados.produtos);
+        setIncompatibilidades(dados.incompatibilidades);
         setHoje(dados.hoje);
         setData(dados.hoje);
         setNascimento(dados.nascimento);
@@ -193,7 +195,7 @@ export default function AnimalVacinacao({
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="font-semibold text-[#123e40]">Vacinação</h3>
+          <h3 className="font-semibold text-[#244b49]">Vacinação</h3>
 
           <p className="mt-1 text-sm text-slate-500">
             Registre a aplicação realizada no animal.
@@ -204,7 +206,7 @@ export default function AnimalVacinacao({
           <button
             type="button"
             onClick={abrir}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49]"
           >
             <svg
               viewBox="0 0 24 24"
@@ -295,7 +297,7 @@ export default function AnimalVacinacao({
                 min="1"
                 max={
                   produto
-                    ? Math.min(Math.floor(Number(produto.saldo)), 999)
+                    ? Math.min(Number(produto.saldo), 999)
                     : 999
                 }
                 step="1"
@@ -321,7 +323,7 @@ export default function AnimalVacinacao({
 
           {produto && (
             <div className="rounded-xl bg-slate-50 p-4 text-sm">
-              <p className="font-medium text-[#123e40]">
+              <p className="font-medium text-[#244b49]">
                 Estoque disponível: {numero(produto.saldo)} doses
               </p>
 
@@ -336,6 +338,17 @@ export default function AnimalVacinacao({
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Não há vacinas com saldo disponível cadastradas na unidade Dose.
             </p>
+          )}
+
+          {incompatibilidades.length > 0 && (
+            <div role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="font-semibold">Vacinas indisponíveis por incompatibilidade do cadastro:</p>
+              <ul className="mt-2 list-disc space-y-2 pl-5">
+                {incompatibilidades.map((item) => (
+                  <li key={item.id}>{item.nome}: {item.motivo}</li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {erro && (
@@ -374,7 +387,7 @@ export default function AnimalVacinacao({
             <button
               type="submit"
               disabled={carregando || salvando || !produto}
-              className="rounded-xl bg-[#486d6b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-[#486d6b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {salvando ? "Registrando..." : "Confirmar vacinação"}
             </button>

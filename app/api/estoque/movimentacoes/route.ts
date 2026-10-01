@@ -1,4 +1,5 @@
 import { prisma } from "@/app/lib/prisma";
+import { incompatibilidadeDose, usaDose } from "@/app/lib/estoque-regras";
 import {
   exigirUsuario,
   ErroAutenticacao,
@@ -130,12 +131,22 @@ export async function POST(request: Request) {
 
     const produtoAtualizado = await prisma.$transaction(
       async (tx) => {
+        await tx.$queryRaw`
+          SELECT id_produto FROM produto
+          WHERE id_produto = ${idProduto}
+          FOR UPDATE
+        `;
+
         const produto = await tx.produto.findUnique({
           where: {
             id_produto: idProduto,
           },
           select: {
             id_produto: true,
+            categoria: true,
+            unidade_medida: true,
+            quantidade: true,
+            estoque_min: true,
           },
         });
 
@@ -144,6 +155,14 @@ export async function POST(request: Request) {
             "Produto não encontrado.",
             404,
           );
+        }
+
+        const incompatibilidade = incompatibilidadeDose(produto);
+        if (incompatibilidade) {
+          throw new ErroValidacao(incompatibilidade, 409);
+        }
+        if (usaDose(produto.unidade_medida) && centesimos % 100 !== 0) {
+          throw new ErroValidacao("Movimentações em Dose devem usar números inteiros maiores que zero.");
         }
 
         if (tipo === "SAIDA") {

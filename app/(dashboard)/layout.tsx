@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-dvh bg-slate-100">
+    <div className="agro-ui min-h-dvh bg-slate-100">
       <Sidebar
         usuario={{
           nome: usuario.nome_usuario,
@@ -26,7 +26,7 @@ export default async function DashboardLayout({
       />
 
       <div className="min-w-0 md:pl-60">
-        <main className="w-full min-w-0 p-4 sm:p-6">
+        <main id="conteudo-principal" className="mx-auto w-full min-w-0 max-w-[1440px] p-4 sm:p-6" tabIndex={-1}>
           {children}
         </main>
       </div>

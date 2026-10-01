@@ -1,7 +1,15 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/prisma";
+import { obterUsuarioAtual } from "@/app/lib/sessao";
 import AnimaisPainel from "@/app/components/animais-painel";
 
 export default async function AnimaisPage() {
+  const usuario = await obterUsuarioAtual();
+
+  if (!usuario) {
+    redirect("/login");
+  }
+
   const [animais, especies] = await Promise.all([
     prisma.animal.findMany({
       include: {

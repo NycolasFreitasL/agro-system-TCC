@@ -133,6 +133,7 @@ model plantio {
   colheita            colheita[]
   fertilizacao        fertilizacao[]
   irrigacao           irrigacao[]
+  evento_plantio      evento_plantio[]
   cultura             cultura?       @relation(fields: [id_cultura], references: [id_cultura], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_cultura")
   lote                lote           @relation(fields: [id_lote], references: [id_lote], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_lote")
   produto             produto        @relation(fields: [id_produto], references: [id_produto], onDelete: NoAction, onUpdate: NoAction, map: "fk_plantio_produto")
@@ -177,6 +178,26 @@ model usuarios {
   move_estoque      move_estoque[]
   plantio           plantio[]
   vacinacao         vacinacao[]
+  evento_plantio    evento_plantio[]
+}
+
+/// CHECKs e índice único parcial constam em docs/sql/proposta-eventos-plantio.sql.
+/// id_plantio não é globalmente único: regularizações podem ter vários eventos.
+model evento_plantio {
+  id_evento     Int      @id(map: "evento_plantio_pkey") @default(autoincrement())
+  id_plantio    Int
+  tipo          String   @db.VarChar(20)
+  modalidade    String?  @db.VarChar(20)
+  motivo        String   @db.VarChar(1000)
+  id_usuario    Int
+  registrado_em DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  antes         Json     @db.JsonB
+  depois        Json     @db.JsonB
+  plantio       plantio  @relation(fields: [id_plantio], references: [id_plantio], onDelete: Restrict, onUpdate: NoAction, map: "fk_evento_plantio")
+  usuarios      usuarios @relation(fields: [id_usuario], references: [id_usuario], onDelete: Restrict, onUpdate: NoAction, map: "fk_evento_usuario")
+
+  // uq_evento_encerramento: UNIQUE(id_plantio) WHERE tipo = 'ENCERRAMENTO', somente no SQL.
+  @@index([id_plantio, registrado_em, id_evento], map: "ix_evento_historico")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.

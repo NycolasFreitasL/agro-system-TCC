@@ -20,11 +20,7 @@ type AnimalModalProps = {
   especies: Especie[];
 };
 
-const estiloCampo =
-  "w-full min-w-0 rounded-xl border border-slate-300 bg-white " +
-  "px-3 py-2.5 text-sm text-slate-800 outline-none transition " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15 " +
-  "disabled:bg-slate-100 disabled:opacity-70";
+const estiloCampo = "input";
 
 function hojeEmSaoPaulo() {
   const partes = new Intl.DateTimeFormat("en-US", {
@@ -59,18 +55,15 @@ export default function AnimalModal({
   const [hoje, setHoje] = useState("");
 
   useEffect(() => {
-    if (!foto) {
-      setPrevia("");
-      return;
-    }
-
-    const endereco = URL.createObjectURL(foto);
-    setPrevia(endereco);
-
     return () => {
-      URL.revokeObjectURL(endereco);
+      if (previa) URL.revokeObjectURL(previa);
     };
-  }, [foto]);
+  }, [previa]);
+
+  function atualizarFoto(arquivo: File | null) {
+    setFoto(arquivo);
+    setPrevia(arquivo ? URL.createObjectURL(arquivo) : "");
+  }
 
   useEffect(() => {
     if (!aberto) {
@@ -99,7 +92,7 @@ export default function AnimalModal({
 
   function abrirModal() {
     setErro("");
-    setFoto(null);
+    atualizarFoto(null);
     setHoje(hojeEmSaoPaulo());
     setAberto(true);
   }
@@ -111,7 +104,7 @@ export default function AnimalModal({
 
     setAberto(false);
     setErro("");
-    setFoto(null);
+    atualizarFoto(null);
   }
 
   function selecionarFoto(
@@ -131,7 +124,7 @@ export default function AnimalModal({
       )
     ) {
       event.target.value = "";
-      setFoto(null);
+      atualizarFoto(null);
       setErro("Selecione uma foto JPG, PNG ou WebP.");
       return;
     }
@@ -141,16 +134,16 @@ export default function AnimalModal({
       arquivo.size > 2 * 1024 * 1024
     ) {
       event.target.value = "";
-      setFoto(null);
+      atualizarFoto(null);
       setErro("A foto deve ter até 2 MB.");
       return;
     }
 
-    setFoto(arquivo);
+    atualizarFoto(arquivo);
   }
 
   function removerFoto() {
-    setFoto(null);
+    atualizarFoto(null);
 
     if (arquivoRef.current) {
       arquivoRef.current.value = "";
@@ -203,7 +196,7 @@ export default function AnimalModal({
       }
 
       formulario.reset();
-      setFoto(null);
+      atualizarFoto(null);
       setAberto(false);
       router.refresh();
     } catch (error) {
@@ -223,7 +216,7 @@ export default function AnimalModal({
       <button
         type="button"
         onClick={abrirModal}
-        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#365452]"
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#244b49]"
       >
         <Icone tipo="adicionar" />
         Novo animal
@@ -247,7 +240,7 @@ export default function AnimalModal({
 
               <h2
                 id={tituloId}
-                className="mt-1 text-xl font-bold text-[#123e40] sm:text-2xl"
+                className="mt-1 text-xl font-bold text-[#244b49] sm:text-2xl"
               >
                 Cadastrar animal
               </h2>
@@ -278,7 +271,7 @@ export default function AnimalModal({
               className="min-w-0 space-y-5"
             >
               <section className="rounded-xl border border-slate-200 bg-white p-5">
-                <h3 className="font-semibold text-[#123e40]">
+                <h3 className="font-semibold text-[#244b49]">
                   Foto do animal
                 </h3>
 
@@ -351,7 +344,7 @@ export default function AnimalModal({
               </section>
 
               <section className="rounded-xl border border-slate-200 bg-white p-5">
-                <h3 className="font-semibold text-[#123e40]">
+                <h3 className="font-semibold text-[#244b49]">
                   Identificação
                 </h3>
 
@@ -483,7 +476,7 @@ export default function AnimalModal({
               <button
                 type="submit"
                 disabled={carregando || especies.length === 0}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-6 py-3 text-sm font-semibold text-white hover:bg-[#365452] disabled:cursor-wait disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-6 py-3 text-sm font-semibold text-white hover:bg-[#244b49] disabled:cursor-wait disabled:opacity-60"
               >
                 {!carregando && <Icone tipo="adicionar" />}
                 {carregando

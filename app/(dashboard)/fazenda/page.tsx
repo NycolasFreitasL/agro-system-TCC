@@ -16,7 +16,7 @@ export default async function FazendaPage() {
   if (usuario.permissao_usuario !== "PROPRIETARIO") {
     return (
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
-        <h1 className="text-xl font-bold text-[#123e40]">
+        <h1 className="text-xl font-bold text-[#244b49]">
           Acesso restrito
         </h1>
 
@@ -95,7 +95,7 @@ export default async function FazendaPage() {
             Administração
           </p>
 
-          <h1 className="mt-1 text-3xl font-bold text-[#123e40]">
+          <h1 className="mt-1 text-3xl font-bold text-[#244b49]">
             Fazenda
           </h1>
 

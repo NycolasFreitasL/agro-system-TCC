@@ -7,12 +7,14 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { quantidadeInteira, usaDose } from "@/app/lib/estoque-regras";
 
 type Produto = {
   id: number;
   nome: string;
   saldo: string;
   unidade: string;
+  incompatibilidade: string | null;
 };
 
 type Props = {
@@ -22,10 +24,7 @@ type Props = {
   aoAlterarEnvio: (enviando: boolean) => void;
 };
 
-const estiloCampo =
-  "w-full min-w-0 rounded-xl border border-slate-300 bg-white " +
-  "px-3 py-2.5 text-sm outline-none focus:border-[#486d6b] " +
-  "focus:ring-2 focus:ring-[#486d6b]/15 disabled:bg-slate-100";
+const estiloCampo = "input";
 
 function numero(valor: string) {
   return Number(valor).toLocaleString("pt-BR", {
@@ -141,6 +140,15 @@ export default function AnimalAlimentacao({
 
     if (enviandoRef.current || !produto) return;
 
+    if (produto.incompatibilidade) {
+      setErro(produto.incompatibilidade);
+      return;
+    }
+    if (usaDose(produto.unidade) && (!quantidadeInteira(quantidade) || Number(quantidade) <= 0)) {
+      setErro("A quantidade em Dose deve ser um número inteiro positivo.");
+      return;
+    }
+
     const formulario = new FormData(event.currentTarget);
 
     enviandoRef.current = true;
@@ -207,7 +215,7 @@ export default function AnimalAlimentacao({
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="font-semibold text-[#123e40]">
+          <h3 className="font-semibold text-[#244b49]">
             Alimentação
           </h3>
 
@@ -220,7 +228,7 @@ export default function AnimalAlimentacao({
           <button
             type="button"
             onClick={abrir}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452]"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49]"
           >
             <svg
               viewBox="0 0 24 24"
@@ -310,14 +318,14 @@ export default function AnimalAlimentacao({
               <input
                 type="number"
                 required
-                min="0.01"
+                min={produto && usaDose(produto.unidade) ? "1" : "0.01"}
                 max={produto?.saldo ?? "99999999.99"}
-                step="0.01"
+                step={produto && usaDose(produto.unidade) ? "1" : "0.01"}
                 value={quantidade}
                 onChange={(event) =>
                   setQuantidade(event.target.value)
                 }
-                placeholder="0,00"
+                placeholder={produto && usaDose(produto.unidade) ? "1" : "0,00"}
                 className={estiloCampo}
               />
             </label>
@@ -339,7 +347,7 @@ export default function AnimalAlimentacao({
 
           {produto && (
             <div className="rounded-xl bg-slate-50 p-4 text-sm">
-              <p className="font-medium text-[#123e40]">
+              <p className="font-medium text-[#244b49]">
                 Estoque disponível: {numero(produto.saldo)}{" "}
                 {produto.unidade}
               </p>
@@ -355,6 +363,12 @@ export default function AnimalAlimentacao({
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Não há produtos da categoria Alimentação com saldo
               disponível.
+            </p>
+          )}
+
+          {produto?.incompatibilidade && (
+            <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              {produto.incompatibilidade}
             </p>
           )}
 
@@ -393,8 +407,8 @@ export default function AnimalAlimentacao({
 
             <button
               type="submit"
-              disabled={carregando || salvando || !produto}
-              className="rounded-xl bg-[#486d6b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={carregando || salvando || !produto || Boolean(produto.incompatibilidade)}
+              className="rounded-xl bg-[#486d6b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {salvando ? "Registrando..." : "Confirmar alimentação"}
             </button>

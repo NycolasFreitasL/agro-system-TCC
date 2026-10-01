@@ -20,10 +20,7 @@ type Props = {
   idUsuarioAtual: number;
 };
 
-const campo =
-  "mt-2 w-full min-w-0 rounded-lg border border-slate-300 " +
-  "bg-white px-3 py-3 text-sm text-slate-900 outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/20";
+const campo = "input mt-2";
 
 export default function UsuariosPainel({
   usuarios,
@@ -282,7 +279,7 @@ export default function UsuariosPainel({
         </header>
 
         {filtrados.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-500">
+          <p className="estado-vazio m-5 sm:m-6">
             Nenhum usuário encontrado.
           </p>
         ) : (

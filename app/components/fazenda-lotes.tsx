@@ -17,10 +17,7 @@ type Lote = {
   areaOcupada: number | null;
 };
 
-const estiloCampo =
-  "mt-2 w-full min-w-0 rounded-xl border border-slate-300 " +
-  "bg-white px-3 py-2.5 text-sm outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15";
+const estiloCampo = "input mt-2";
 
 function hectares(valor: number) {
   return `${valor.toLocaleString("pt-BR", {
@@ -141,7 +138,7 @@ export default function FazendaLotes({
     <section className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-sm">
       <header className="flex flex-col gap-4 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div>
-          <h2 className="font-bold text-[#123e40]">
+          <h2 className="font-bold text-[#244b49]">
             Lotes agrícolas
           </h2>
 
@@ -154,7 +151,7 @@ export default function FazendaLotes({
           type="button"
           onClick={() => abrirFormulario()}
           disabled={salvando || aberto}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:opacity-50"
         >
           <svg
             viewBox="0 0 24 24"
@@ -177,7 +174,7 @@ export default function FazendaLotes({
             aria-busy={salvando}
             className="rounded-xl border border-slate-200 bg-slate-50 p-4"
           >
-            <h3 className="font-semibold text-[#123e40]">
+            <h3 className="font-semibold text-[#244b49]">
               {editandoId === null ? "Cadastrar lote" : "Editar lote"}
             </h3>
 
@@ -245,7 +242,7 @@ export default function FazendaLotes({
               <button
                 type="submit"
                 disabled={salvando}
-                className="rounded-lg bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#365452] disabled:opacity-50"
+                className="rounded-lg bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:opacity-50"
               >
                 {salvando ? "Salvando..." : "Salvar lote"}
               </button>
@@ -272,7 +269,7 @@ export default function FazendaLotes({
         )}
 
         {lotes.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">
+          <p className="estado-vazio">
             Nenhum lote cadastrado.
           </p>
         ) : (
@@ -291,7 +288,7 @@ export default function FazendaLotes({
                     className={
                       "rounded-full px-2.5 py-1 text-xs font-medium " +
                       (lote.status === "ATIVO"
-                        ? "bg-[#486d6b]/10 text-[#365452]"
+                        ? "bg-[#486d6b]/10 text-[#244b49]"
                         : "bg-slate-100 text-slate-500")
                     }
                   >
@@ -308,7 +305,7 @@ export default function FazendaLotes({
                     <dt className="text-xs text-slate-500">
                       Área total
                     </dt>
-                    <dd className="mt-1 font-semibold text-[#123e40]">
+                    <dd className="mt-1 font-semibold text-[#244b49]">
                       {hectares(Number(lote.area))}
                     </dd>
                   </div>
@@ -317,7 +314,7 @@ export default function FazendaLotes({
                     <dt className="text-xs text-slate-500">
                       Área ocupada
                     </dt>
-                    <dd className="mt-1 font-semibold text-[#123e40]">
+                    <dd className="mt-1 font-semibold text-[#244b49]">
                       {lote.areaOcupada === null
                         ? "Não calculada"
                         : hectares(lote.areaOcupada)}
@@ -336,7 +333,7 @@ export default function FazendaLotes({
                   {lote.totalPlantios} registros de plantio
                 </p>
 
-                <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
                   <button
                     type="button"
                     onClick={() => abrirFormulario(lote)}

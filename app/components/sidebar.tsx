@@ -12,8 +12,7 @@ type IconeNome =
   | "cultivo"
   | "estoque"
   | "fazenda"
-  | "perfil"
-  | "configuracoes"
+  | "usuarios"
   | "sair";
 
 type SidebarProps = {
@@ -125,7 +124,7 @@ export default function Sidebar({ usuario }: SidebarProps) {
           href={item.href}
           aria-current={ativo ? "page" : undefined}
           onClick={() => setMenuAberto(false)}
-          className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] ${
+          className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] ${
             ativo
               ? "bg-[#486d6b] text-white"
               : "text-slate-600 hover:bg-[#edf4f3] hover:text-[#244b49]"
@@ -140,7 +139,8 @@ export default function Sidebar({ usuario }: SidebarProps) {
 
   return (
     <aside className="sticky top-0 z-30 flex max-h-dvh w-full flex-col border-b border-slate-200 bg-white md:fixed md:inset-y-0 md:left-0 md:h-dvh md:w-60 md:border-b-0 md:border-r">
-      <div className="flex shrink-0 items-center justify-between gap-3 p-4 md:px-5 md:py-7">
+      <a href="#conteudo-principal" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-40 focus:rounded-lg focus:bg-white focus:p-3 focus:text-[#244b49]">Pular para o conteúdo</a>
+      <div className="flex shrink-0 items-center justify-between gap-3 p-4 md:py-5">
         <Link
           href="/dashboard"
           onClick={() => setMenuAberto(false)}
@@ -184,55 +184,41 @@ export default function Sidebar({ usuario }: SidebarProps) {
 
       <div
         id={navegacaoId}
-        className={`min-h-0 overflow-y-auto ${
+        className={`min-h-0 max-h-[calc(100dvh-4.5rem)] flex-1 overflow-hidden ${
           menuAberto ? "flex flex-col" : "hidden"
         } md:flex md:flex-1 md:flex-col`}
       >
-        <nav aria-label="Navegação principal" className="px-3 pb-5 md:flex-1">
-          <p className="mb-3 px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Gestão da propriedade
+        <nav aria-label="Navegação principal" className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <p className="mb-2 px-3 pt-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            Principal
           </p>
 
-          <ul className="space-y-2">{itens.map(linkMenu)}</ul>
+          <ul className="space-y-1">{itens.map(linkMenu)}</ul>
 
           {proprietario && (
             <>
-              <p className="mb-3 mt-7 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <p className="mb-2 mt-5 px-3 text-xs font-medium uppercase tracking-wider text-slate-500">
                 Administração
               </p>
 
-              <ul className="space-y-2">
+              <ul className="space-y-1">
                 {linkMenu({
                   href: "/fazenda",
                   titulo: "Fazenda",
                   icone: "fazenda",
                 })}
+                {linkMenu({ href: "/usuarios", titulo: "Usuários", icone: "usuarios" })}
               </ul>
             </>
           )}
 
-          <p className="mb-3 mt-7 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Minha conta
-          </p>
-
-          <ul className="space-y-2">
-            {linkMenu({
-              href: "/perfil",
-              titulo: "Meu perfil",
-              icone: "perfil",
-            })}
-
-            {linkMenu({
-              href: "/configuracoes",
-              titulo: "Configurações",
-              icone: "configuracoes",
-            })}
-          </ul>
         </nav>
 
-        <footer className="shrink-0 border-t border-slate-100 p-4">
+        <footer className="shrink-0 border-t border-slate-100 p-3">
           <Link
             href="/perfil"
+            aria-label={`Abrir perfil de ${usuario.nome}`}
+            aria-current={pathname === "/perfil" ? "page" : undefined}
             onClick={() => setMenuAberto(false)}
             className="flex min-w-0 items-center gap-3 rounded-lg p-2 transition hover:bg-[#edf4f3] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b]"
           >
@@ -250,7 +236,7 @@ export default function Sidebar({ usuario }: SidebarProps) {
                 {usuario.nome}
               </p>
 
-              <p className="mt-1 text-xs text-slate-500">{permissao}</p>
+              <p className="mt-1 break-words text-xs text-slate-500">{permissao}</p>
             </div>
           </Link>
 
@@ -258,7 +244,7 @@ export default function Sidebar({ usuario }: SidebarProps) {
             type="button"
             onClick={sair}
             disabled={saindo}
-            className="mt-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-3 text-sm font-semibold text-slate-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] disabled:cursor-wait disabled:opacity-60"
+            className="mt-2 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#486d6b] disabled:cursor-wait disabled:opacity-60"
           >
             <Icone nome="sair" />
             {saindo ? "Saindo..." : "Sair"}
@@ -362,18 +348,10 @@ function Icone({ nome }: { nome: IconeNome }) {
         </>
       )}
 
-      {nome === "perfil" && (
+      {nome === "usuarios" && (
         <>
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21v-2a8 8 0 0 1 16 0v2" />
-        </>
-      )}
-      
-      {nome === "configuracoes" && (
-        <>
-          <path d="M4 7h16M4 17h16" />
-          <rect x="7" y="4" width="4" height="6" rx="1" />
-          <rect x="14" y="14" width="4" height="6" rx="1" />
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2" />
         </>
       )}
 

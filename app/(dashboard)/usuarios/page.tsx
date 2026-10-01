@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/prisma";
 import { obterUsuarioAtual } from "@/app/lib/sessao";
 import UsuariosPainel from "@/app/components/usuarios-painel";
+import UiIcon from "@/app/components/ui-icon";
 
 export default async function UsuariosPage() {
   const usuarioAtual = await obterUsuarioAtual();
@@ -34,10 +35,11 @@ export default async function UsuariosPage() {
     <div className="mx-auto w-full min-w-0 max-w-5xl">
       <header className="mb-7">
         <Link
-          href="/configuracoes"
-          className="text-sm font-semibold text-[#486d6b] hover:underline"
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-[#486d6b] hover:underline"
         >
-          Voltar às configurações
+          <UiIcon nome="voltar" />
+          Voltar ao Dashboard
         </Link>
 
         <p className="mt-5 text-xs font-semibold uppercase tracking-wider text-[#486d6b]">

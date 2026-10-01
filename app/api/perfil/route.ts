@@ -124,6 +124,11 @@ export async function PATCH(request: Request) {
           where: {
             id_usuario: usuarioAtual.id_usuario,
           },
+          select: {
+            id_usuario: true,
+            email: true,
+            senha: true,
+          },
         });
 
         if (!usuario) {

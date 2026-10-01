@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { noMinimoOuAbaixo } from "@/app/lib/estoque-regras";
 import ProdutoModal from "@/app/components/produtomodal";
 import MovimentacaoModal from "@/app/components/movimentacaomodal";
 
@@ -38,7 +39,6 @@ type NomeIcone =
   | "caixa"
   | "alerta"
   | "movimento"
-  | "valor"
   | "busca"
   | "filtro"
   | "planta";
@@ -90,7 +90,7 @@ function situacao(produto: ProdutoEstoque): Situacao {
     return "SEM_ESTOQUE";
   }
 
-  return produto.quantidade < produto.estoque_min
+  return noMinimoOuAbaixo(produto.quantidade, produto.estoque_min)
     ? "BAIXO"
     : "NORMAL";
 }
@@ -101,39 +101,26 @@ export default function EstoquePainel({
   movimentacoesHoje,
 }: Props) {
   const filtroId = useId();
-
+  const buscaId = useId();
   const [busca, setBusca] = useState("");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [categoria, setCategoria] = useState("");
   const [status, setStatus] = useState("");
 
-  const categorias = Array.from(
-    new Set(produtos.map(categoriaExibida)),
-  ).sort((a, b) => a.localeCompare(b, "pt-BR"));
-
-  const semEstoque = produtos.filter(
-    (produto) => situacao(produto) === "SEM_ESTOQUE",
-  ).length;
-
-  const abaixoMinimo = produtos.filter(
-    (produto) => situacao(produto) === "BAIXO",
-  ).length;
-
+  const categorias = Array.from(new Set(produtos.map(categoriaExibida)))
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const semEstoque = produtos.filter((produto) => situacao(produto) === "SEM_ESTOQUE").length;
+  const noMinimo = produtos.filter((produto) => noMinimoOuAbaixo(produto.quantidade, produto.estoque_min)).length;
   const produtosFiltrados = produtos.filter((produto) => {
-    const texto = normalizar(
-      `${produto.nome_produto} ${produto.id_produto} ${
-        produto.culturaNome ?? ""
-      }`,
-    );
-
-    return (
-      texto.includes(normalizar(busca)) &&
-      (!categoria || categoriaExibida(produto) === categoria) &&
-      (!status || situacao(produto) === status)
-    );
+    const texto = normalizar(`${produto.nome_produto} ${produto.id_produto} ${produto.culturaNome ?? ""}`);
+    return texto.includes(normalizar(busca))
+      && (!categoria || categoriaExibida(produto) === categoria)
+      && (!status || (status === "BAIXO"
+        ? noMinimoOuAbaixo(produto.quantidade, produto.estoque_min)
+        : situacao(produto) === status));
   });
-
-  const possuiFiltro = Boolean(busca || categoria || status);
+  const filtrosAtivos = Number(Boolean(categoria)) + Number(Boolean(status));
+  const possuiFiltro = Boolean(busca.trim() || filtrosAtivos);
 
   function limparFiltros() {
     setBusca("");
@@ -141,472 +128,227 @@ export default function EstoquePainel({
     setStatus("");
   }
 
-  const input =
-    "w-full min-w-0 rounded-lg border border-slate-300 bg-white " +
-    "px-3 py-2.5 text-sm outline-none focus:border-[#486d6b] " +
-    "focus:ring-2 focus:ring-[#486d6b]/15";
-
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1440px] text-slate-700">
-      <header className="mb-7 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-[#444]">
-            Estoque
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Gerencie a entrada e saída de produtos.
-          </p>
+    <div className="estoque-ui mx-auto w-full min-w-0 max-w-[1440px] space-y-5 text-slate-700">
+      <header className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wider text-[#486d6b]">Gestão de produtos</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-[#244b49] sm:text-3xl">Estoque</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-500">Acompanhe saldos, mínimos e movimentações dos produtos da fazenda.</p>
         </div>
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <ProdutoModal />
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
           <MovimentacaoModal produtos={produtos} />
+          <ProdutoModal />
         </div>
       </header>
 
-      <section
-        aria-label="Resumo do estoque"
-        className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        <Indicador
-          titulo="Total de produtos"
-          valor={produtos.length.toLocaleString("pt-BR")}
-          descricao="Produtos cadastrados"
-          icone="caixa"
-        />
-
-        <Indicador
-          titulo="Produtos em alerta"
-          valor={(semEstoque + abaixoMinimo).toLocaleString("pt-BR")}
-          descricao={`${abaixoMinimo} abaixo do mínimo · ${semEstoque} sem estoque`}
-          icone="alerta"
-          alerta
-        />
-
-        <Indicador
-          titulo="Movimentações hoje"
-          valor={movimentacoesHoje.toLocaleString("pt-BR")}
-          descricao="Entradas e saídas registradas"
-          icone="movimento"
-        />
-
-        <Indicador
-          titulo="Valor em estoque"
-          valor="Não disponível"
-          descricao="Custos dos produtos ainda não cadastrados"
-          icone="valor"
-        />
+      <section aria-label="Resumo do estoque" className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
+        <Indicador titulo="Produtos cadastrados" valor={produtos.length.toLocaleString("pt-BR")}
+          descricao="Todos os produtos, inclusive os sem saldo." icone="caixa" />
+        <Indicador titulo="Produtos em alerta" valor={noMinimo.toLocaleString("pt-BR")}
+          descricao={`No mínimo ou abaixo · ${semEstoque} sem estoque`} icone="alerta" alerta />
+        <Indicador titulo="Movimentações hoje" valor={movimentacoesHoje.toLocaleString("pt-BR")}
+          descricao="Registros de entrada e saída no dia, em Brasília." icone="movimento" />
       </section>
 
-      <section className="min-w-0 rounded-xl bg-white p-4 shadow-sm sm:p-5">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-[#444]">
-              Níveis de estoque
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Visualize o estoque de todos os produtos.
+      <section aria-labelledby="estoque-produtos-titulo" className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <header className="space-y-4 border-b border-slate-200 p-4 sm:p-5">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <h2 id="estoque-produtos-titulo" className="text-base font-semibold text-[#244b49]">Produtos em estoque</h2>
+            <p aria-live="polite" aria-atomic="true" className="text-xs text-slate-500">
+              {produtosFiltrados.length} de {produtos.length} produtos
             </p>
           </div>
-
-          <div className="flex min-w-0 items-center gap-2">
-            <label className="relative block min-w-0 flex-1 lg:w-72">
-              <span className="sr-only">
-                Buscar por produto, código ou cultura
-              </span>
-
-              <span className="pointer-events-none absolute left-3 top-3 text-slate-500">
-                <Icone nome="busca" />
-              </span>
-
-              <input
-                type="search"
-                value={busca}
-                onChange={(event) => setBusca(event.target.value)}
-                placeholder="Buscar produtos..."
-                className={`${input} pl-10`}
-              />
-            </label>
-
-            <button
-              type="button"
-              aria-label="Mostrar filtros"
-              aria-expanded={mostrarFiltros}
-              aria-controls={filtroId}
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="shrink-0 rounded-lg bg-[#486d6b] p-3 text-white hover:bg-[#365553]"
-            >
-              <Icone nome="filtro" />
-            </button>
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <label htmlFor={buscaId} className="mb-2 block text-sm font-medium text-slate-700">Buscar produto</label>
+              <div className="relative min-w-0">
+                <span className="pointer-events-none absolute left-3 top-3 text-slate-400"><Icone nome="busca" /></span>
+                <input id={buscaId} type="search" value={busca} onChange={(event) => setBusca(event.target.value)}
+                  placeholder="Nome, código ou cultura" className="input input-busca" />
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <button type="button" aria-expanded={mostrarFiltros} aria-controls={filtroId}
+                onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium ${mostrarFiltros || filtrosAtivos ? "border-[#486d6b]/40 bg-[#edf4f3] text-[#244b49]" : "border-slate-300 bg-white text-slate-600 hover:bg-slate-50"}`}>
+                <Icone nome="filtro" />
+                Filtros
+                {filtrosAtivos > 0 && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#486d6b] px-1 text-xs text-white">
+                  <span className="sr-only">ativos: </span>{filtrosAtivos}
+                </span>}
+              </button>
+              {possuiFiltro && <button type="button" onClick={limparFiltros}
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-[#486d6b] hover:bg-[#edf4f3]">Limpar filtros</button>}
+            </div>
           </div>
-        </div>
-
-        {mostrarFiltros && (
-          <div
-            id={filtroId}
-            className="mb-4 grid grid-cols-1 items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:grid-cols-3"
-          >
-            <label className="block min-w-0 text-sm">
-              <span className="mb-2 block font-semibold">Categoria</span>
-              <select
-                value={categoria}
-                onChange={(event) => setCategoria(event.target.value)}
-                className={input}
-              >
-                <option value="">Todas</option>
-                {categorias.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
+          <div id={filtroId} hidden={!mostrarFiltros} className="grid min-w-0 grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Categoria</span>
+              <select value={categoria} onChange={(event) => setCategoria(event.target.value)} className="input">
+                <option value="">Todas as categorias</option>
+                {categorias.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
-
-            <label className="block min-w-0 text-sm">
-              <span className="mb-2 block font-semibold">Situação</span>
-              <select
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-                className={input}
-              >
-                <option value="">Todas</option>
+            <label className="block min-w-0">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Situação</span>
+              <select value={status} onChange={(event) => setStatus(event.target.value)} className="input">
+                <option value="">Todas as situações</option>
                 <option value="NORMAL">Normal</option>
-                <option value="BAIXO">Estoque baixo</option>
+                <option value="BAIXO">No mínimo ou abaixo</option>
                 <option value="SEM_ESTOQUE">Sem estoque</option>
               </select>
             </label>
-
-            <button
-              type="button"
-              onClick={limparFiltros}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-100"
-            >
-              Limpar filtros
-            </button>
           </div>
-        )}
-
-        <p aria-live="polite" className="mb-3 text-xs text-slate-500">
-          {produtosFiltrados.length} de {produtos.length} produtos
-        </p>
+          {filtrosAtivos > 0 && <p className="text-xs leading-5 text-slate-500">
+            Filtros aplicados: {[categoria, status === "BAIXO" ? "No mínimo ou abaixo" : status === "SEM_ESTOQUE" ? "Sem estoque" : status === "NORMAL" ? "Normal" : ""].filter(Boolean).join(" · ")}
+          </p>}
+        </header>
 
         {produtosFiltrados.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 px-4 py-12 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[#edf3f2] text-[#486d6b]">
-              <Icone nome="caixa" />
+          <div className="p-4 sm:p-5">
+            <div className="estado-vazio">
+              <span className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#edf4f3] text-[#486d6b]">
+                <Icone nome={produtos.length === 0 ? "caixa" : "busca"} />
+              </span>
+              <p className="font-medium text-slate-700">{produtos.length === 0 ? "Seu estoque ainda está vazio" : "Nenhum produto encontrado"}</p>
+              <p className="mt-2 text-sm text-slate-500">{produtos.length === 0 ? "Cadastre o primeiro produto em Novo produto para começar." : "Tente outro nome, código ou cultura, ou limpe os filtros."}</p>
             </div>
-
-            <p className="font-semibold">
-              {produtos.length === 0
-                ? "Nenhum produto cadastrado"
-                : "Nenhum produto encontrado"}
-            </p>
-
-            <p className="mt-2 text-sm text-slate-500">
-              {produtos.length === 0
-                ? "Use Novo produto para começar."
-                : "Experimente outro nome ou ajuste os filtros."}
-            </p>
-
-            {possuiFiltro && (
-              <button
-                type="button"
-                onClick={limparFiltros}
-                className="mt-4 text-sm font-semibold text-[#486d6b]"
-              >
-                Limpar pesquisa e filtros
-              </button>
-            )}
           </div>
         ) : (
           <>
-            <div className="hidden max-w-full overflow-x-auto rounded-lg border border-[#315c5e] lg:block">
-              <table className="w-full min-w-[720px] table-fixed text-left text-sm">
-                <caption className="sr-only">
-                  Produtos, saldos, níveis mínimos e situação do estoque
-                </caption>
-
-                <thead>
-                  <tr className="border-b border-[#315c5e] text-slate-800">
-                    <th scope="col" className="w-[28%] px-4 py-4">
-                      Produto
-                    </th>
-                    <th scope="col" className="w-[18%] px-4 py-4">
-                      Estoque atual
-                    </th>
-                    <th scope="col" className="w-[18%] px-4 py-4">
-                      Estoque mínimo
-                    </th>
-                    <th scope="col" className="w-[20%] px-4 py-4">
-                      Nível
-                    </th>
-                    <th scope="col" className="w-[16%] px-4 py-4">
-                      Situação
-                    </th>
+            <div tabIndex={0} role="region" aria-label="Tabela de produtos" className="hidden max-w-full overflow-x-auto lg:block">
+              <table className="w-full min-w-[840px] table-fixed text-left text-sm">
+                <caption className="sr-only">Produtos, categorias, saldos, mínimos, situação e ação de movimentação.</caption>
+                <thead className="bg-slate-50 text-xs text-slate-500">
+                  <tr className="border-b border-slate-200">
+                    <th scope="col" className="w-[30%] px-5 py-3 font-medium">Produto</th>
+                    <th scope="col" className="w-[15%] px-4 py-3 text-right font-medium">Saldo atual</th>
+                    <th scope="col" className="w-[15%] px-4 py-3 text-right font-medium">Estoque mínimo</th>
+                    <th scope="col" className="w-[22%] px-4 py-3 font-medium">Situação</th>
+                    <th scope="col" className="w-[18%] px-4 py-3 text-right font-medium">Ação</th>
                   </tr>
                 </thead>
-
-                <tbody className="divide-y divide-[#315c5e]/40">
+                <tbody className="divide-y divide-slate-100">
                   {produtosFiltrados.map((produto) => (
-                    <tr
-                      key={produto.id_produto}
-                      className="hover:bg-[#f4f8f7]"
-                    >
-                      <td className="px-4 py-4">
-                        <Identificacao produto={produto} />
-                      </td>
-
-                      <td className="break-words px-4 py-4 font-semibold">
-                        {numero(produto.quantidade)}{" "}
-                        {unidade(produto.unidade_medida)}
-                      </td>
-
-                      <td className="break-words px-4 py-4">
-                        {numero(produto.estoque_min)}{" "}
-                        {unidade(produto.unidade_medida)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <Nivel produto={produto} />
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <Etiqueta produto={produto} />
-                      </td>
+                    <tr key={produto.id_produto} className="hover:bg-slate-50/70">
+                      <td className="px-5 py-4"><Identificacao produto={produto} /></td>
+                      <td className="break-words px-4 py-4 text-right font-medium tabular-nums text-slate-800">{numero(produto.quantidade)} <span className="text-xs font-normal text-slate-500">{unidade(produto.unidade_medida)}</span></td>
+                      <td className="break-words px-4 py-4 text-right tabular-nums">{numero(produto.estoque_min)} <span className="text-xs text-slate-500">{unidade(produto.unidade_medida)}</span></td>
+                      <td className="px-4 py-4"><Etiqueta produto={produto} /></td>
+                      <td className="px-3 py-4 text-right"><AcaoMovimentar produto={produto} /></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
-            <ul className="space-y-3 lg:hidden">
+            <ul className="divide-y divide-slate-100 lg:hidden">
               {produtosFiltrados.map((produto) => (
-                <li
-                  key={produto.id_produto}
-                  className="min-w-0 rounded-lg border border-[#315c5e]/30 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <Identificacao produto={produto} />
-                    <Etiqueta produto={produto} />
-                  </div>
-
-                  <dl className="my-4 grid grid-cols-2 gap-3 text-sm">
+                <li key={produto.id_produto} className="min-w-0 space-y-4 p-4 sm:p-5">
+                  <Identificacao produto={produto} />
+                  <dl className="grid min-w-0 grid-cols-2 gap-3 text-sm">
                     <div className="min-w-0">
-                      <dt className="text-xs text-slate-500">
-                        Estoque atual
-                      </dt>
-                      <dd className="mt-1 break-words font-semibold">
-                        {numero(produto.quantidade)}{" "}
-                        {unidade(produto.unidade_medida)}
-                      </dd>
+                      <dt className="text-xs text-slate-500">Saldo atual</dt>
+                      <dd className="mt-1 break-words font-medium tabular-nums text-slate-800">{numero(produto.quantidade)} {unidade(produto.unidade_medida)}</dd>
                     </div>
-
                     <div className="min-w-0">
-                      <dt className="text-xs text-slate-500">
-                        Estoque mínimo
-                      </dt>
-                      <dd className="mt-1 break-words font-semibold">
-                        {numero(produto.estoque_min)}{" "}
-                        {unidade(produto.unidade_medida)}
-                      </dd>
+                      <dt className="text-xs text-slate-500">Estoque mínimo</dt>
+                      <dd className="mt-1 break-words tabular-nums">{numero(produto.estoque_min)} {unidade(produto.unidade_medida)}</dd>
                     </div>
                   </dl>
-
-                  <Nivel produto={produto} />
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+                    <Etiqueta produto={produto} />
+                    <AcaoMovimentar produto={produto} />
+                  </div>
                 </li>
               ))}
             </ul>
           </>
         )}
-
-        <p className="mt-4 text-xs text-slate-500">
-          A barra compara o saldo ao mínimo cadastrado. Uma barra
-          completa indica que o mínimo foi atingido, não que o
-          depósito está cheio.
+        <p className="border-t border-slate-100 px-4 py-3 text-xs leading-5 text-slate-500 sm:px-5">
+          Alerta: quantidade no mínimo ou abaixo. Os saldos mantêm a unidade cadastrada de cada produto.
         </p>
       </section>
 
-      <details className="mt-6 min-w-0 rounded-xl bg-white p-4 shadow-sm sm:p-5">
-        <summary className="cursor-pointer font-semibold text-[#444]">
-          Movimentações recentes
+      <details className="min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm">
+        <summary className="cursor-pointer px-4 py-4 text-sm font-medium text-[#244b49] sm:px-5">
+          Movimentações recentes <span className="ml-1 text-xs font-normal text-slate-500">({movimentacoes.length})</span>
         </summary>
-
-        <p className="mt-2 text-xs text-slate-500">
-          Últimos 10 registros. Horários de Brasília.
-        </p>
-
-        {movimentacoes.length === 0 ? (
-          <p className="py-6 text-sm text-slate-500">
-            Nenhuma movimentação registrada.
-          </p>
-        ) : (
-          <ul className="mt-4 divide-y divide-slate-200">
-            {movimentacoes.map((movimento) => {
-              const entrada = movimento.tipo === "ENTRADA";
-              const saida = ["SAIDA", "SAÍDA"].includes(
-                movimento.tipo,
-              );
-
-              return (
-                <li key={movimento.id} className="py-4">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-                    <p className="break-words font-semibold">
-                      {movimento.produto}
+        <div className="border-t border-slate-100 px-4 pb-1 pt-3 sm:px-5">
+          <p className="text-xs text-slate-500">Últimos 10 registros · horários de Brasília</p>
+          {movimentacoes.length === 0 ? (
+            <p className="py-5 text-sm text-slate-500">Nenhuma movimentação registrada.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-slate-100">
+              {movimentacoes.map((movimento) => {
+                const entrada = movimento.tipo === "ENTRADA";
+                const saida = ["SAIDA", "SAÍDA"].includes(movimento.tipo);
+                return (
+                  <li key={movimento.id} className="min-w-0 py-3">
+                    <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <p className="min-w-0 break-words text-sm font-medium text-slate-800">{movimento.produto}</p>
+                      <p className={`break-words text-sm font-medium tabular-nums ${entrada ? "text-[#486d6b]" : saida ? "text-red-700" : "text-slate-600"}`}>
+                        {entrada ? "Entrada" : saida ? "Saída" : movimento.tipo} · {numero(movimento.quantidade)} {unidade(movimento.unidade)}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      {new Date(movimento.data).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" })} · {movimento.responsavel}
                     </p>
-
-                    <p
-                      className={`text-sm font-semibold ${
-                        entrada
-                          ? "text-[#486d6b]"
-                          : saida
-                            ? "text-red-700"
-                            : "text-slate-600"
-                      }`}
-                    >
-                      {entrada ? "Entrada" : saida ? "Saída" : movimento.tipo}
-                      {" · "}
-                      {numero(movimento.quantidade)}{" "}
-                      {unidade(movimento.unidade)}
-                    </p>
-                  </div>
-
-                  <p className="mt-1 break-words text-xs text-slate-500">
-                    {new Date(movimento.data).toLocaleString("pt-BR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                      timeZone: "America/Sao_Paulo",
-                    })}
-                    {" · "}
-                    {movimento.responsavel}
-                  </p>
-
-                  <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">
-                    {movimento.observacao || "Sem observação"}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{movimento.observacao || "Sem observação"}</p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </details>
     </div>
   );
 }
 
-function Identificacao({ produto }: { produto: ProdutoEstoque }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#123e40] text-white">
-        <Icone nome={produto.id_cultura !== null ? "planta" : "caixa"} />
-      </span>
-
-      <div className="min-w-0">
-        <p className="break-words font-semibold">{produto.nome_produto}</p>
-        <p className="mt-1 break-words text-xs text-slate-500">
-          {categoriaExibida(produto)}
-          {produto.culturaNome ? ` · ${produto.culturaNome}` : ""}
-        </p>
-      </div>
-    </div>
-  );
+function AcaoMovimentar({ produto }: { produto: ProdutoEstoque }) {
+  return <MovimentacaoModal idProduto={produto.id_produto} nomeProduto={produto.nome_produto}
+    quantidadeAtual={produto.quantidade} unidadeMedida={produto.unidade_medida}
+    categoria={produto.categoria} estoqueMinimo={produto.estoque_min} />;
 }
 
-function Nivel({ produto }: { produto: ProdutoEstoque }) {
-  if (produto.estoque_min <= 0) {
-    return (
-      <span className="text-xs text-slate-500">
-        Sem mínimo definido
-      </span>
-    );
-  }
-
-  const percentual = Math.max(
-    0,
-    (produto.quantidade / produto.estoque_min) * 100,
-  );
-
-  const cor =
-    situacao(produto) === "NORMAL"
-      ? "bg-[#486d6b]"
-      : situacao(produto) === "BAIXO"
-        ? "bg-amber-600"
-        : "bg-red-600";
-
+function Identificacao({ produto }: { produto: ProdutoEstoque }) {
   return (
-    <div>
-      <div aria-hidden="true" className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-        <div
-          className={`h-full rounded-full ${cor}`}
-          style={{ width: `${Math.min(100, percentual)}%` }}
-        />
+    <div className="flex min-w-0 items-start gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#edf4f3] text-[#486d6b]">
+        <Icone nome={produto.id_cultura !== null ? "planta" : "caixa"} />
+      </span>
+      <div className="min-w-0">
+        <p className="break-words font-medium leading-5 text-slate-800">{produto.nome_produto}</p>
+        <p className="mt-1 break-words text-xs leading-5 text-slate-500">
+          {categoriaExibida(produto)}{produto.culturaNome ? ` · ${produto.culturaNome}` : ""}
+        </p>
+        <p className="text-xs leading-5 text-slate-500">Cód. {produto.id_produto}</p>
       </div>
-
-      <p className="mt-1.5 text-xs text-slate-500">
-        {percentual.toLocaleString("pt-BR", {
-          maximumFractionDigits: 1,
-        })}
-        % do mínimo
-      </p>
     </div>
   );
 }
 
 function Etiqueta({ produto }: { produto: ProdutoEstoque }) {
   const config = {
-    NORMAL: {
-      texto: "Normal",
-      classe: "bg-[#486d6b] text-white",
-    },
-    BAIXO: {
-      texto: "Baixo",
-      classe: "bg-amber-600 text-white",
-    },
-    SEM_ESTOQUE: {
-      texto: "Sem estoque",
-      classe: "bg-red-50 text-red-700",
-    },
+    NORMAL: { texto: "Normal", classe: "border-[#486d6b]/15 bg-[#edf4f3] text-[#244b49]" },
+    BAIXO: { texto: "No mínimo ou abaixo", classe: "border-amber-200 bg-amber-50 text-amber-800" },
+    SEM_ESTOQUE: { texto: "Sem estoque", classe: "border-red-200 bg-red-50 text-red-700" },
   }[situacao(produto)];
-
-  return (
-    <span
-      className={`inline-block rounded-md px-3 py-1.5 text-xs font-semibold ${config.classe}`}
-    >
-      {config.texto}
-    </span>
-  );
+  return <span className={`inline-flex max-w-full items-center rounded-full border px-2.5 py-1 text-xs font-medium ${config.classe}`}>{config.texto}</span>;
 }
 
-function Indicador({
-  titulo,
-  valor,
-  descricao,
-  icone,
-  alerta = false,
-}: {
-  titulo: string;
-  valor: string;
-  descricao: string;
-  icone: NomeIcone;
-  alerta?: boolean;
+function Indicador({ titulo, valor, descricao, icone, alerta = false }: {
+  titulo: string; valor: string; descricao: string; icone: NomeIcone; alerta?: boolean;
 }) {
   return (
-    <article className="flex min-w-0 flex-col rounded-xl bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold">{titulo}</h2>
-        <span className={alerta ? "text-amber-600" : "text-[#486d6b]"}>
-          <Icone nome={icone} />
-        </span>
+    <article className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <h2 className="text-sm font-medium leading-5 text-slate-600">{titulo}</h2>
+        <span className={`shrink-0 ${alerta ? "text-amber-600" : "text-[#486d6b]"}`}><Icone nome={icone} /></span>
       </div>
-
-      <p
-        className={`my-5 break-words text-2xl font-bold ${
-          alerta ? "text-amber-700" : "text-[#444]"
-        }`}
-      >
-        {valor}
-      </p>
-
-      <p className="mt-auto text-xs text-slate-500">{descricao}</p>
+      <p className={`my-2 text-2xl font-semibold leading-8 tabular-nums ${alerta ? "text-amber-800" : "text-[#244b49]"}`}>{valor}</p>
+      <p className="text-xs leading-5 text-slate-500">{descricao}</p>
     </article>
   );
 }
@@ -643,11 +385,6 @@ function Icone({ nome }: { nome: NomeIcone }) {
         </>
       )}
 
-      {nome === "valor" && (
-        <>
-          <path d="M12 2v20M17 6H9a3 3 0 0 0 0 6h6a3 3 0 0 1 0 6H6" />
-        </>
-      )}
 
       {nome === "busca" && (
         <>

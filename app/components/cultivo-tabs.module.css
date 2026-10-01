@@ -1,0 +1,59 @@
+.tabs {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* Mais específico que o raio global dos botões, restrito a esta barra. */
+.tabs .tab {
+  flex: 0 0 auto;
+  min-width: 6rem;
+  min-height: 44px;
+  padding: 0.75rem 0.875rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25rem;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tabs .tab:hover {
+  color: #244b49;
+}
+
+.tabs .tab[aria-pressed="true"] {
+  border-bottom-color: #486d6b;
+  color: #244b49;
+  font-weight: 600;
+}
+
+/* Contorno interno permanece visível na área rolável e difere da seleção. */
+.tabs .tab:focus-visible {
+  outline: 2px solid #486d6b;
+  outline-offset: -4px;
+}
+
+@media (min-width: 640px) {
+  .tabs {
+    gap: 1.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs .tab {
+    transition: none;
+  }
+}

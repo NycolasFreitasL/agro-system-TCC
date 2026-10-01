@@ -1,4 +1,5 @@
 import { prisma } from "@/app/lib/prisma";
+import { incompatibilidadeDose, quantidadeInteira, usaDose } from "@/app/lib/estoque-regras";
 import {
   exigirUsuario,
   ErroAutenticacao,
@@ -178,6 +179,7 @@ export async function GET(request: Request) {
         nome_produto: true,
         quantidade: true,
         unidade_medida: true,
+        estoque_min: true,
       },
       orderBy: {
         nome_produto: "asc",
@@ -191,6 +193,7 @@ export async function GET(request: Request) {
           nome: produto.nome_produto,
           saldo: produto.quantidade.toString(),
           unidade: produto.unidade_medida,
+          incompatibilidade: incompatibilidadeDose(produto),
         })),
         hoje: hojeEmSaoPaulo(),
         nascimento:
@@ -339,6 +342,14 @@ export async function POST(request: Request) {
         throw new ErroValidacao(
           "A unidade do produto mudou. Reabra o formulário e confira a quantidade.",
         );
+      }
+
+      const incompatibilidade = incompatibilidadeDose(produto);
+      if (incompatibilidade) {
+        throw new ErroValidacao(incompatibilidade, 409);
+      }
+      if (usaDose(produto.unidade_medida) && !quantidadeInteira(quantidade)) {
+        throw new ErroValidacao("A quantidade em Dose deve ser um número inteiro positivo.");
       }
 
       const atualizacao = await tx.produto.updateMany({

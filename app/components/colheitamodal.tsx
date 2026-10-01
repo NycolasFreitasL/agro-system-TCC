@@ -7,6 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import UiIcon from "@/app/components/ui-icon";
 
 type Props = {
   idPlantio: number;
@@ -191,8 +192,9 @@ export default function ColheitaModal({
       <button
         type="button"
         onClick={() => setAberto(true)}
-        className="rounded-lg px-3 py-2 text-sm font-semibold text-[#244b49] hover:bg-[#edf4f3]"
+        className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#244b49] hover:bg-[#edf4f3]"
       >
+        <UiIcon nome="adicionar" />
         Registrar colheita
       </button>
 
@@ -230,7 +232,7 @@ export default function ColheitaModal({
             disabled={salvando}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-2xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
           >
-            ×
+            <UiIcon nome="fechar" />
           </button>
         </header>
 

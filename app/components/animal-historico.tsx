@@ -13,10 +13,7 @@ type Registro = {
   responsavel: string;
 };
 
-const estiloCampo =
-  "w-full min-w-0 rounded-lg border border-slate-300 bg-white " +
-  "px-3 py-2.5 text-sm text-slate-700 outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15";
+const estiloCampo = "input";
 
 function normalizar(valor: string) {
   return valor
@@ -161,7 +158,7 @@ export default function AnimalHistorico({
 
   return (
     <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <h3 className="font-semibold text-[#123e40]">
+      <h3 className="font-semibold text-[#244b49]">
         Histórico do animal
       </h3>
 
@@ -271,8 +268,8 @@ export default function AnimalHistorico({
             carregados
           </p>
 
-          <div className="hidden max-w-full overflow-x-auto rounded-xl border border-slate-200 sm:block">
-            <table className="w-full min-w-[600px] text-left text-sm">
+          <div tabIndex={0} role="region" aria-label="Tabela do histórico do animal" className="hidden max-w-full overflow-x-auto rounded-xl border border-slate-200 sm:block">
+            <table className="w-full min-w-[600px] table-fixed text-left text-sm">
               <thead className="bg-[#486d6b] text-white">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-medium">
@@ -396,7 +393,7 @@ function TipoRegistro({
       className={
         "inline-flex rounded-full px-2.5 py-1 text-xs font-medium " +
         (tipo === "ALIMENTACAO"
-          ? "bg-[#486d6b]/10 text-[#365452]"
+          ? "bg-[#486d6b]/10 text-[#244b49]"
           : "bg-blue-50 text-blue-700")
       }
     >

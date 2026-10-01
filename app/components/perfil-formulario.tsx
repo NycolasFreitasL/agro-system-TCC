@@ -20,10 +20,7 @@ type Aviso = {
   mensagem: string;
 };
 
-const campo =
-  "mt-2 w-full min-w-0 rounded-lg border border-slate-300 " +
-  "bg-white px-3 py-3 text-sm text-slate-900 outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/20";
+const campo = "input mt-2";
 
 const botao =
   "inline-flex min-h-11 w-full items-center justify-center gap-2 " +

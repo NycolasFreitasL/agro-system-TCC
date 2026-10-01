@@ -1,7 +1,15 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/prisma";
+import { obterUsuarioAtual } from "@/app/lib/sessao";
 import EstoquePainel from "@/app/components/estoque-painel";
 
 export default async function EstoquePage() {
+  const usuario = await obterUsuarioAtual();
+
+  if (!usuario) {
+    redirect("/login");
+  }
+
   const [produtos, movimentacoes, contagemHoje] =
     await Promise.all([
       prisma.produto.findMany({
@@ -29,7 +37,11 @@ export default async function EstoquePage() {
         ],
         include: {
           produto: true,
-          usuarios: true,
+          usuarios: {
+            select: {
+              nome_usuario: true,
+            },
+          },
         },
       }),
 

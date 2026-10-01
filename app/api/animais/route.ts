@@ -291,21 +291,37 @@ export async function POST(request: Request) {
       fotoEnviada = await enviarFotoAnimal(foto);
     }
 
-    const animal = await prisma.animal.create({
-      data: {
-        nome_animal: nome,
-        id_especie: idEspecie,
-        raca_animal: raca || null,
-        sexo_animal: sexo,
-        data_nascimento: nascimento,
-        peso_animal: peso,
-        saude_animal: saude,
-        foto_animal: fotoEnviada?.url ?? null,
-        status_animal: "ATIVO",
-      },
-      include: {
-        especie: true,
-      },
+    const animal = await prisma.$transaction(async (tx) => {
+      // Mesmo bloqueio da edição/desativação e exclusão de espécies.
+      // O upload terminou antes de iniciar a transação.
+      await tx.$queryRaw`
+        SELECT id_especie FROM especie
+        WHERE id_especie = ${idEspecie}
+        FOR UPDATE
+      `;
+
+      const especieAtual = await tx.especie.findUnique({
+        where: { id_especie: idEspecie },
+        select: { status: true },
+      });
+      if (!especieAtual || especieAtual.status !== "ATIVO") {
+        throw new ErroValidacao("A espécie selecionada não existe ou está inativa. Atualize a seleção e tente novamente.");
+      }
+
+      return tx.animal.create({
+        data: {
+          nome_animal: nome,
+          id_especie: idEspecie,
+          raca_animal: raca || null,
+          sexo_animal: sexo,
+          data_nascimento: nascimento,
+          peso_animal: peso,
+          saude_animal: saude,
+          foto_animal: fotoEnviada?.url ?? null,
+          status_animal: "ATIVO",
+        },
+        include: { especie: true },
+      });
     });
 
     animalSalvo = true;

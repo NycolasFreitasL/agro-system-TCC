@@ -1,4 +1,5 @@
 import { prisma } from "@/app/lib/prisma";
+import { quantidadeInteira, usaDose } from "@/app/lib/estoque-regras";
 import {
   exigirUsuario,
   ErroAutenticacao,
@@ -169,6 +170,10 @@ export async function POST(request: Request) {
 
     const unidadeMedida = UNIDADES[unidadeInformada];
 
+    if (categoria === "Vacina" && !usaDose(unidadeMedida)) {
+      throw new ErroValidacao("Vacinas devem ser cadastradas em Dose. Não há conversão automática de ML para doses.");
+    }
+
     const quantidade = lerQuantidade(
       dados.quantidade,
       "a quantidade inicial",
@@ -178,6 +183,15 @@ export async function POST(request: Request) {
       dados.estoqueMinimo,
       "o estoque mínimo",
     );
+
+    if (usaDose(unidadeMedida)) {
+      if (!quantidadeInteira(quantidade)) {
+        throw new ErroValidacao("A quantidade inicial em Dose deve ser um número inteiro não negativo.");
+      }
+      if (!quantidadeInteira(estoqueMinimo)) {
+        throw new ErroValidacao("O estoque mínimo em Dose deve ser um número inteiro não negativo.");
+      }
+    }
 
     const exigeCultura =
       categoria === "Semente" ||
@@ -237,6 +251,12 @@ export async function POST(request: Request) {
 
     const produto = await prisma.$transaction(
       async (tx) => {
+        // Todo cadastro de produto passa por esta rota.
+        // Uma futura renomeação deve adquirir o mesmo bloqueio.
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(73142, 5)::text AS bloqueio
+        `;
+
         if (idCultura !== null) {
           const cultura = await tx.cultura.findUnique({
             where: {
@@ -251,17 +271,13 @@ export async function POST(request: Request) {
           }
         }
 
-        const produtoExistente =
-          await tx.produto.findFirst({
-            where: {
-              nome_produto: {
-                equals: nome,
-                mode: "insensitive",
-              },
-            },
-          });
+        const produtosExistentes = await tx.$queryRaw<{ id_produto: number }[]>`
+          SELECT id_produto FROM produto
+          WHERE lower(nome_produto) = lower(${nome})
+          LIMIT 1
+        `;
 
-        if (produtoExistente) {
+        if (produtosExistentes.length > 0) {
           throw new ErroValidacao(
             "Já existe um produto cadastrado com esse nome.",
             409,
@@ -301,6 +317,8 @@ export async function POST(request: Request) {
 
         return novoProduto;
       },
+      // A consulta após esperar o bloqueio precisa enxergar o último commit.
+      { isolationLevel: "ReadCommitted" },
     );
 
     return Response.json(

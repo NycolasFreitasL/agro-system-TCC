@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import ProductionChart from "@/app/components/productionChart";
 import { prisma } from "@/app/lib/prisma";
+import { noMinimoOuAbaixo } from "@/app/lib/estoque-regras";
 import { obterUsuarioAtual } from "@/app/lib/sessao";
 
 type IconeNome = "animais" | "cultivo" | "estoque" | "alerta";
@@ -133,7 +134,7 @@ export default async function DashboardPage() {
   const alertas = produtos
     .filter(
       (produto) =>
-        Number(produto.quantidade) <= Number(produto.estoque_min),
+        noMinimoOuAbaixo(Number(produto.quantidade), Number(produto.estoque_min)),
     )
     .sort((a, b) => {
       // Produtos sem saldo aparecem primeiro.
@@ -234,7 +235,7 @@ export default async function DashboardPage() {
     {
       titulo: "Alertas de estoque",
       valor: alertas.length,
-      descricao: "Produtos no mínimo ou abaixo",
+      descricao: "No mínimo ou abaixo",
       icone: "alerta",
       href: "/estoque",
     },
@@ -440,7 +441,7 @@ export default async function DashboardPage() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Produtos com saldo igual ou inferior ao mínimo cadastrado.
+              No mínimo ou abaixo do estoque mínimo cadastrado.
             </p>
           </div>
 

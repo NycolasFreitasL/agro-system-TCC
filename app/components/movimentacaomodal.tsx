@@ -8,8 +8,12 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
+import { incompatibilidadeDose, quantidadeInteira, usaDose } from "@/app/lib/estoque-regras";
+import UiIcon from "@/app/components/ui-icon";
 
 export type ProdutoMovimentacao = {
+  categoria?: string;
+  estoque_min?: number;
   id_produto: number;
   nome_produto: string;
   quantidade: number;
@@ -25,12 +29,11 @@ type MovimentacaoModalProps =
       nomeProduto: string;
       quantidadeAtual: number;
       unidadeMedida: string;
+      categoria?: string;
+      estoqueMinimo?: number;
     };
 
-const campo =
-  "mt-2 w-full min-w-0 rounded-lg border border-slate-300 " +
-  "bg-white px-3 py-2.5 text-sm text-slate-800 outline-none " +
-  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15";
+const campo = "input mt-1.5";
 
 function numero(valor: number) {
   return valor.toLocaleString("pt-BR", {
@@ -59,9 +62,14 @@ export default function MovimentacaoModal(
 ) {
   const router = useRouter();
   const tituloId = useId();
+  const descricaoId = useId();
+  const quantidadeHintId = useId();
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const enviandoRef = useRef(false);
+  const botaoRef = useRef<HTMLButtonElement>(null);
+  const produtoRef = useRef<HTMLSelectElement>(null);
+  const quantidadeRef = useRef<HTMLInputElement>(null);
 
   const [aberto, setAberto] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -85,6 +93,8 @@ export default function MovimentacaoModal(
             nome_produto: props.nomeProduto,
             quantidade: props.quantidadeAtual,
             unidade_medida: props.unidadeMedida,
+            categoria: props.categoria,
+            estoque_min: props.estoqueMinimo,
           },
         ];
 
@@ -95,7 +105,10 @@ export default function MovimentacaoModal(
   const quantidadeValida =
     /^\d{1,8}(\.\d{1,2})?$/.test(quantidade) &&
     Number(quantidade) > 0 &&
-    Number(quantidade) <= 99999999.99;
+    Number(quantidade) <= 99999999.99 &&
+    (!produto || !usaDose(produto.unidade_medida) || quantidadeInteira(quantidade));
+
+  const incompatibilidade = produto ? incompatibilidadeDose(produto) : null;
 
   const quantidadeCentesimos = quantidadeValida
     ? Math.round(Number(quantidade) * 100)
@@ -142,6 +155,7 @@ export default function MovimentacaoModal(
     }
 
     const dialog = dialogRef.current;
+    const botao = botaoRef.current;
 
     if (!dialog) {
       return;
@@ -149,6 +163,12 @@ export default function MovimentacaoModal(
 
     if (!dialog.open) {
       dialog.showModal();
+    }
+
+    if (geral) {
+      produtoRef.current?.focus();
+    } else {
+      quantidadeRef.current?.focus();
     }
 
     const overflowAnterior = document.body.style.overflow;
@@ -160,13 +180,22 @@ export default function MovimentacaoModal(
       if (dialog.open) {
         dialog.close();
       }
+
+      if (botao?.isConnected) {
+        botao.focus();
+      }
     };
-  }, [aberto]);
+  }, [aberto, geral]);
 
   async function registrar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (enviandoRef.current) {
+      return;
+    }
+
+    if (incompatibilidade) {
+      setErro(incompatibilidade);
       return;
     }
 
@@ -243,113 +272,98 @@ export default function MovimentacaoModal(
   return (
     <>
       <button
+        ref={botaoRef}
         type="button"
         onClick={abrir}
         disabled={produtos.length === 0}
+        aria-label={geral ? "Registrar movimentação" : `Movimentar ${props.nomeProduto}`}
         className={
           geral
-            ? "inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#365553] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-            : "font-semibold text-[#486d6b] hover:text-[#123e40]"
+            ? "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-[#486d6b] transition hover:border-[#486d6b] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            : "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-[#486d6b] hover:bg-slate-50 hover:text-[#244b49]"
         }
       >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0">
+          <path d="M4 7h14m-4-4 4 4-4 4M20 17H6m4-4-4 4 4 4" />
+        </svg>
         {geral ? "Registrar movimentação" : "Movimentar"}
-
-        {geral && (
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="h-5 w-5"
-          >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        )}
       </button>
 
       <dialog
         ref={dialogRef}
         aria-labelledby={tituloId}
+        aria-describedby={descricaoId}
         onCancel={(event) => {
           event.preventDefault();
           fechar();
         }}
-        className="fixed inset-0 m-auto max-h-[92dvh] w-[94vw] max-w-3xl overflow-y-auto rounded-2xl border-0 bg-[#f5f5f5] p-0 text-slate-800 shadow-2xl backdrop:bg-black/50"
+        onClose={() => {
+          if (!enviandoRef.current) setAberto(false);
+        }}
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[94vw] max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 text-slate-800 shadow-xl backdrop:bg-slate-950/45"
       >
         {aberto && (
           <>
-            <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-[#f5f5f5] p-5 sm:px-7">
-              <h2
-                id={tituloId}
-                className="text-xl font-bold sm:text-2xl"
-              >
-                Registrar movimentação
-              </h2>
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-200 bg-white p-4 sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <h2 id={tituloId} className="text-xl font-semibold text-[#244b49]">
+                  Registrar movimentação
+                </h2>
+                <p id={descricaoId} className="mt-1 text-sm text-slate-500">
+                  Informe a entrada ou saída e confira o saldo previsto.
+                </p>
+              </div>
 
               <button
                 type="button"
                 onClick={fechar}
                 disabled={salvando}
-                aria-label="Fechar modal"
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 disabled:opacity-50"
+                aria-label="Fechar movimentação de estoque"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-500 hover:bg-slate-100 disabled:opacity-50"
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-5 w-5"
-                >
-                  <path d="m6 6 12 12M18 6 6 18" />
-                </svg>
+                <UiIcon nome="fechar" />
               </button>
             </header>
 
-            <form onSubmit={registrar} className="p-5 sm:p-7">
-              <fieldset disabled={salvando} className="min-w-0">
-                <div
-                  role="group"
-                  aria-label="Tipo de movimentação"
-                  className="mb-5 grid grid-cols-2 gap-3 sm:gap-6"
-                >
-                  {(["ENTRADA", "SAIDA"] as const).map(
-                    (opcao) => (
-                      <button
-                        key={opcao}
-                        type="button"
-                        aria-pressed={tipo === opcao}
-                        onClick={() => {
-                          setTipo(opcao);
-                          setErro("");
-                        }}
-                        className={
-                          tipo === opcao
-                            ? "rounded-lg border border-[#486d6b] bg-[#486d6b] px-4 py-2.5 font-semibold text-white"
-                            : "rounded-lg border border-slate-300 bg-white px-4 py-2.5 font-semibold text-slate-500 hover:bg-slate-50"
-                        }
-                      >
-                        {opcao === "ENTRADA" ? "Entrada" : "Saída"}
-                      </button>
-                    ),
-                  )}
-                </div>
+            <form onSubmit={registrar} aria-busy={salvando} className="p-4 sm:p-6">
+              <fieldset disabled={salvando} className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+                <div className="min-w-0">
+                  <div
+                    role="group"
+                    aria-label="Tipo de movimentação"
+                    className="mb-4 grid grid-cols-2 gap-2"
+                  >
+                    {(["ENTRADA", "SAIDA"] as const).map(
+                      (opcao) => (
+                        <button
+                          key={opcao}
+                          type="button"
+                          aria-pressed={tipo === opcao}
+                          onClick={() => {
+                            setTipo(opcao);
+                            setErro("");
+                          }}
+                          className={
+                            tipo === opcao
+                              ? "min-h-11 rounded-xl border border-[#486d6b] bg-[#486d6b] px-3 py-2.5 text-sm font-semibold text-white"
+                              : "min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                          }
+                        >
+                          {opcao === "ENTRADA" ? "Entrada" : "Saída"}
+                        </button>
+                      ),
+                    )}
+                  </div>
 
-                <div className="rounded-xl bg-white p-4 shadow-sm sm:p-5">
-                  <p className="mb-5 text-sm text-slate-500">
-                    Use para movimentações manuais. Plantios e
-                    colheitas registrados no sistema já atualizam
-                    o estoque automaticamente.
-                  </p>
-
-                  <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div className="grid min-w-0 grid-cols-1 gap-4">
                     <label className="block min-w-0">
-                      <span className="text-sm font-semibold">
-                        Produto
+                      <span className="text-sm font-medium text-slate-700">
+                        Produto <span aria-hidden="true" className="ml-1 text-red-600">*</span>
                       </span>
 
                       <select
+                        ref={produtoRef}
+                        name="produto"
                         required
                         value={produtoId}
                         onChange={(event) => {
@@ -375,22 +389,27 @@ export default function MovimentacaoModal(
                     </label>
 
                     <label className="block min-w-0">
-                      <span className="text-sm font-semibold">
+                      <span className="text-sm font-medium text-slate-700">
                         Quantidade
                         {produto
                           ? ` (${unidadeFormatada(
                               produto.unidade_medida,
                             )})`
                           : ""}
+                        <span aria-hidden="true" className="ml-1 text-red-600">*</span>
                       </span>
 
                       <input
+                        ref={quantidadeRef}
+                        name="quantidade"
+                        aria-describedby={quantidadeHintId}
+                        aria-invalid={saldoInvalido || Boolean(incompatibilidade)}
                         type="number"
                         required
-                        min="0.01"
-                        max="99999999.99"
-                        step="0.01"
-                        placeholder="0,00"
+                        min={produto && usaDose(produto.unidade_medida) ? "1" : "0.01"}
+                        max={produto && usaDose(produto.unidade_medida) ? "99999999" : "99999999.99"}
+                        step={produto && usaDose(produto.unidade_medida) ? "1" : "0.01"}
+                        placeholder={produto && usaDose(produto.unidade_medida) ? "Ex.: 2 doses" : "0,00"}
                         value={quantidade}
                         onChange={(event) => {
                           setQuantidade(event.target.value);
@@ -398,14 +417,20 @@ export default function MovimentacaoModal(
                         }}
                         className={campo}
                       />
+                      <span id={quantidadeHintId} className="mt-1.5 block text-xs text-slate-500">
+                        {produto && usaDose(produto.unidade_medida)
+                          ? "Informe um número inteiro maior que zero."
+                          : "Informe uma quantidade maior que zero, com até duas casas decimais."}
+                      </span>
                     </label>
 
-                    <label className="block min-w-0 sm:col-span-2">
-                      <span className="text-sm font-semibold">
-                        Observação
+                    <label className="block min-w-0">
+                      <span className="text-sm font-medium text-slate-700">
+                        Observação <span className="font-normal text-slate-500">(opcional)</span>
                       </span>
 
                       <textarea
+                        name="observacao"
                         rows={3}
                         maxLength={255}
                         placeholder="Informe o motivo da entrada ou saída."
@@ -417,12 +442,15 @@ export default function MovimentacaoModal(
                       />
                     </label>
                   </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Plantios e colheitas já atualizam o estoque. Use este formulário para movimentações manuais.
+                  </p>
                 </div>
 
-                <section className="mt-5 rounded-xl bg-white p-4 shadow-sm sm:p-5">
-                  <h3 className="text-lg font-bold">Resumo</h3>
+                <section className="min-w-0 self-start rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-semibold text-[#244b49]">Resumo da movimentação</h3>
 
-                  <dl className="mt-4 grid min-w-0 grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                  <dl className="mt-3 grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2 md:grid-cols-1">
                     <Resumo
                       titulo="Tipo"
                       valor={tipo === "ENTRADA" ? "Entrada" : "Saída"}
@@ -455,19 +483,21 @@ export default function MovimentacaoModal(
                       }
                     />
 
-                    <div className="sm:col-span-2">
+                    <div className="min-w-0 border-t border-slate-200 pt-3 sm:col-span-2 md:col-span-1">
                       <dt className="text-slate-500">
                         Saldo previsto após a movimentação
                       </dt>
 
                       <dd
-                        className={`mt-1 text-xl font-bold ${
+                        aria-live="polite"
+                        aria-atomic="true"
+                        className={`mt-1 break-words text-xl font-semibold tabular-nums ${
                           saldoInvalido
                             ? "text-red-700"
-                            : "text-[#123e40]"
+                            : "text-[#244b49]"
                         }`}
                       >
-                        {produto && quantidadeValida
+                        {produto && quantidadeValida && !incompatibilidade
                           ? `${numero(
                               saldoPrevistoCentesimos / 100,
                             )} ${unidadeFormatada(produto.unidade_medida)}`
@@ -480,7 +510,7 @@ export default function MovimentacaoModal(
                     </div>
 
                     {observacao.trim() && (
-                      <div className="min-w-0 sm:col-span-2">
+                      <div className="min-w-0 sm:col-span-2 md:col-span-1">
                         <dt className="text-slate-500">Observação</dt>
                         <dd className="mt-1 whitespace-pre-wrap break-words">
                           {observacao.trim()}
@@ -491,21 +521,33 @@ export default function MovimentacaoModal(
                 </section>
               </fieldset>
 
+              {incompatibilidade && (
+                <p role="alert" className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
+                  {incompatibilidade}
+                </p>
+              )}
+
+              {saldoInvalido && (
+                <p role="alert" className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700">
+                  {tipo === "SAIDA" ? "A quantidade supera o saldo disponível." : "A entrada ultrapassa o limite de saldo permitido."}
+                </p>
+              )}
+
               {erro && (
                 <p
                   role="alert"
-                  className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700"
+                  className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-700"
                 >
                   {erro}
                 </p>
               )}
 
-              <footer className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <footer className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={fechar}
                   disabled={salvando}
-                  className="rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -516,11 +558,12 @@ export default function MovimentacaoModal(
                     salvando ||
                     !produto ||
                     !quantidadeValida ||
-                    saldoInvalido
+                    saldoInvalido ||
+                    Boolean(incompatibilidade)
                   }
-                  className="rounded-lg bg-[#486d6b] px-6 py-3 text-sm font-semibold text-white hover:bg-[#365553] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 rounded-xl bg-[#486d6b] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {salvando ? "Registrando..." : "Registrar"}
+                  {salvando ? "Registrando..." : "Registrar movimentação"}
                 </button>
               </footer>
             </form>
@@ -541,7 +584,7 @@ function Resumo({
   return (
     <div className="min-w-0">
       <dt className="text-slate-500">{titulo}</dt>
-      <dd className="mt-1 break-words font-semibold">{valor}</dd>
+      <dd className="mt-1 break-words font-medium tabular-nums text-slate-700">{valor}</dd>
     </div>
   );
 }

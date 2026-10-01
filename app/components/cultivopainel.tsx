@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import UiIcon from "@/app/components/ui-icon";
+import styles from "./cultivo-tabs.module.css";
 
 type PainelProps = {
   plantios: ReactNode;
@@ -33,7 +35,7 @@ export default function CultivoPainel({
     <section className="min-w-0">
       <nav
         aria-label="Visualização do cultivo"
-        className="mb-6 flex gap-6 border-b border-slate-200"
+        className={styles.tabs}
       >
         {abas.map((item) => (
           <button
@@ -41,11 +43,7 @@ export default function CultivoPainel({
             type="button"
             aria-pressed={aba === item.id}
             onClick={() => setAba(item.id)}
-            className={`border-b-2 px-1 pb-3 text-sm font-semibold transition-colors ${
-              aba === item.id
-                ? "border-[#486d6b] text-[#244b49]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
+            className={styles.tab}
           >
             {item.titulo}
           </button>
@@ -104,12 +102,12 @@ export function DetalhesCultivo({
         aria-labelledby={tituloId}
         onCancel={() => setAberto(false)}
         onClose={() => setAberto(false)}
-        className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-black/60"
+        className="fixed inset-0 m-auto max-h-[90dvh] w-[92vw] max-w-2xl overflow-y-auto rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-black/60"
       >
         <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white p-5">
           <h2
             id={tituloId}
-            className="text-xl font-bold text-[#244b49]"
+            className="min-w-0 break-words text-xl font-bold text-[#244b49]"
           >
             {titulo}
           </h2>
@@ -118,9 +116,9 @@ export function DetalhesCultivo({
             type="button"
             aria-label="Fechar detalhes"
             onClick={() => setAberto(false)}
-            className="rounded-lg px-3 py-1 text-2xl text-slate-500 hover:bg-slate-100"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
           >
-            ×
+            <UiIcon nome="fechar" />
           </button>
         </header>
 

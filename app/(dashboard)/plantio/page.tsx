@@ -1,8 +1,11 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/app/lib/prisma";
+import { obterUsuarioAtual } from "@/app/lib/sessao";
 import PlantioModal from "@/app/components/plantiomodal";
 import ColheitaModal from "@/app/components/colheitamodal";
 import EncerrarCultivo from "@/app/components/encerrar-cultivo";
 import CultivoPainel, { DetalhesCultivo } from "@/app/components/cultivopainel";
+import { nomeModalidade } from "@/app/lib/encerramento-cultivo";
 
 const DIA = 24 * 60 * 60 * 1000;
 
@@ -54,21 +57,41 @@ type Evento = {
   lote: string;
   tipo: string;
   data: Date;
-  quantidade: number;
+  quantidade: number | null;
   unidade: string;
   observacao: string | null;
+  responsavel?: string;
+  encerramento?: boolean;
 };
 
 export default async function PlantioPage() {
+  const usuario = await obterUsuarioAtual();
+
+  if (!usuario) {
+    redirect("/login");
+  }
+
   const [plantios, lotesBanco, sementesBanco] = await Promise.all([
     prisma.plantio.findMany({
       include: {
         cultura: true,
         produto: true,
         lote: true,
-        usuarios: true,
+        usuarios: {
+          select: {
+            nome_usuario: true,
+          },
+        },
         colheita: true,
         irrigacao: true,
+        evento_plantio: {
+          where: { tipo: "ENCERRAMENTO" },
+          select: {
+            id_evento: true, modalidade: true, motivo: true, registrado_em: true,
+            usuarios: { select: { nome_usuario: true } },
+          },
+          orderBy: [{ registrado_em: "desc" }, { id_evento: "desc" }],
+        },
         fertilizacao: {
           include: {
             produto: true,
@@ -166,6 +189,17 @@ export default async function PlantioPage() {
       };
 
       return [
+        ...plantio.evento_plantio.map((registro) => ({
+          ...base,
+          chave: `encerramento-${registro.id_evento}`,
+          tipo: nomeModalidade(registro.modalidade),
+          data: registro.registrado_em,
+          quantidade: null,
+          unidade: "",
+          observacao: registro.motivo,
+          responsavel: registro.usuarios.nome_usuario,
+          encerramento: true,
+        })),
         ...plantio.colheita.map((registro) => ({
           ...base,
           chave: `colheita-${registro.id_colheita}`,
@@ -355,6 +389,7 @@ export default async function PlantioPage() {
               idPlantio={plantio.id_plantio}
               nomeCultura={nome}
               possuiColheita={plantio.colheita.length > 0}
+              areaPlantada={plantio.area_plantada === null ? null : numero(Number(plantio.area_plantada))}
             />
           </div>
         </div>
@@ -579,7 +614,7 @@ export default async function PlantioPage() {
                       key={plantio.id_plantio}
                       className="flex flex-col gap-2 rounded-lg bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <div>
+                      <div className="min-w-0">
                         <p className="font-semibold text-slate-800">
                           {plantio.cultura?.nome_cultura ??
                             plantio.produto.nome_produto}
@@ -591,10 +626,22 @@ export default async function PlantioPage() {
                           {" · Plantado em "}
                           {dataFormatada(plantio.data_plantio)}
                         </p>
+                        <p className="mt-1 break-words text-sm text-slate-500">
+                          Responsável pelo plantio: {plantio.usuarios.nome_usuario}
+                        </p>
+                        {plantio.evento_plantio.length === 0 && (
+                          <p className="mt-2 text-xs text-slate-500">
+                            Sem evento de encerramento registrado. Modalidade, motivo, responsável e data do encerramento não informados.
+                          </p>
+                        )}
+                        <details className="mt-3">
+                          <summary className="cursor-pointer text-sm font-semibold text-[#486d6b]">Ver histórico deste cultivo</summary>
+                          <div className="mt-3"><ListaEventos eventos={eventos.filter((evento) => evento.idPlantio === plantio.id_plantio)} /></div>
+                        </details>
                       </div>
 
                       <span className="text-xs font-semibold text-slate-600">
-                        {plantio.status_plantio}
+                        {plantio.evento_plantio[0] ? nomeModalidade(plantio.evento_plantio[0].modalidade) : plantio.status_plantio}
                       </span>
                     </li>
                   ))}
@@ -632,9 +679,9 @@ function Indicador({
 
 function Info({ titulo, valor }: { titulo: string; valor: string }) {
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <dt className="text-slate-500">{titulo}</dt>
-      <dd className="min-w-0 break-words text-right font-medium text-slate-800">
+      <dd className="min-w-0 break-words font-medium text-slate-800 sm:text-right">
         {valor}
       </dd>
     </div>
@@ -643,7 +690,7 @@ function Info({ titulo, valor }: { titulo: string; valor: string }) {
 
 function Vazio({ texto }: { texto: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
+    <div className="estado-vazio">
       {texto}
     </div>
   );
@@ -665,7 +712,9 @@ function ListaEventos({ eventos }: { eventos: Evento[] }) {
             <strong className="text-sm text-[#244b49]">{evento.tipo}</strong>
 
             <span className="text-xs text-slate-500">
-              {dataFormatada(evento.data)}
+              {evento.encerramento
+                ? new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(evento.data) + " (Brasília)"
+                : dataFormatada(evento.data)}
             </span>
           </div>
 
@@ -673,13 +722,14 @@ function ListaEventos({ eventos }: { eventos: Evento[] }) {
             {evento.cultura} · {evento.lote} · Plantio #{evento.idPlantio}
           </p>
 
-          <p className="mt-1 text-sm font-semibold text-slate-800">
+          {evento.quantidade !== null && <p className="mt-1 text-sm font-semibold text-slate-800">
             {numero(evento.quantidade)} {evento.unidade}
-          </p>
+          </p>}
+          {evento.responsavel && <p className="mt-2 break-words text-sm text-slate-600">Responsável pelo encerramento: {evento.responsavel}</p>}
 
           {evento.observacao && (
-            <p className="mt-2 break-words text-sm text-slate-500">
-              {evento.observacao}
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-500">
+              {evento.encerramento && "Motivo: "}{evento.observacao}
             </p>
           )}
         </li>

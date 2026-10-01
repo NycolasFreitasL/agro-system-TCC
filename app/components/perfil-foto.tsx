@@ -28,18 +28,15 @@ export default function PerfilFoto({ nome, fotoAtual }: Props) {
   const [sucesso, setSucesso] = useState("");
 
   useEffect(() => {
-    if (!arquivo) {
-      setPrevia(null);
-      return;
-    }
-
-    const url = URL.createObjectURL(arquivo);
-    setPrevia(url);
-
     return () => {
-      URL.revokeObjectURL(url);
+      if (previa) URL.revokeObjectURL(previa);
     };
-  }, [arquivo]);
+  }, [previa]);
+
+  function atualizarArquivo(foto: File | null) {
+    setArquivo(foto);
+    setPrevia(foto ? URL.createObjectURL(foto) : null);
+  }
 
   function selecionar(event: ChangeEvent<HTMLInputElement>) {
     const foto = event.target.files?.[0];
@@ -52,22 +49,22 @@ export default function PerfilFoto({ nome, fotoAtual }: Props) {
     if (!["image/jpeg", "image/png", "image/webp"].includes(foto.type)) {
       setErro("Selecione uma imagem JPG, PNG ou WebP.");
       event.target.value = "";
-      setArquivo(null);
+      atualizarArquivo(null);
       return;
     }
 
     if (foto.size === 0 || foto.size > 4 * 1024 * 1024) {
       setErro("Selecione uma foto de até 4 MB.");
       event.target.value = "";
-      setArquivo(null);
+      atualizarArquivo(null);
       return;
     }
 
-    setArquivo(foto);
+    atualizarArquivo(foto);
   }
 
   function cancelarSelecao() {
-    setArquivo(null);
+    atualizarArquivo(null);
     setErro("");
     setSucesso("");
 

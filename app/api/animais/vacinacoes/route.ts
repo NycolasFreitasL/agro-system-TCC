@@ -1,4 +1,5 @@
 import { prisma } from "@/app/lib/prisma";
+import { incompatibilidadeDose } from "@/app/lib/estoque-regras";
 import {
   exigirUsuario,
   ErroAutenticacao,
@@ -166,18 +167,14 @@ export async function GET(request: Request) {
           equals: "Vacina",
           mode: "insensitive",
         },
-        unidade_medida: {
-          equals: "DOSE",
-          mode: "insensitive",
-        },
-        quantidade: {
-          gte: "1",
-        },
       },
       select: {
         id_produto: true,
         nome_produto: true,
         quantidade: true,
+        categoria: true,
+        unidade_medida: true,
+        estoque_min: true,
       },
       orderBy: {
         nome_produto: "asc",
@@ -186,11 +183,17 @@ export async function GET(request: Request) {
 
     return Response.json(
       {
-        produtos: produtos.map((produto) => ({
+        produtos: produtos.filter((produto) =>
+          !incompatibilidadeDose(produto) && Number(produto.quantidade) >= 1,
+        ).map((produto) => ({
           id: produto.id_produto,
           nome: produto.nome_produto,
           saldo: produto.quantidade.toString(),
         })),
+        incompatibilidades: produtos.flatMap((produto) => {
+          const motivo = incompatibilidadeDose(produto);
+          return motivo ? [{ id: produto.id_produto, nome: produto.nome_produto, motivo }] : [];
+        }),
         hoje: hojeEmSaoPaulo(),
         nascimento:
           animal.data_nascimento
@@ -326,8 +329,13 @@ export async function POST(request: Request) {
         produto.unidade_medida.trim().toUpperCase() !== "DOSE"
       ) {
         throw new ErroValidacao(
-          "Esta operação aceita apenas vacinas cadastradas em doses.",
+          "Esta operação aceita apenas vacinas cadastradas em Dose. Não há conversão automática de ML para doses.",
         );
+      }
+
+      const incompatibilidade = incompatibilidadeDose(produto);
+      if (incompatibilidade) {
+        throw new ErroValidacao(incompatibilidade, 409);
       }
 
       const atualizacao = await tx.produto.updateMany({

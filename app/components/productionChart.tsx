@@ -39,7 +39,7 @@ export default function ProductionChart({
 
   if (!possuiDados) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center rounded-xl bg-slate-50 px-4 text-center">
+      <div className="estado-vazio flex min-h-64 flex-col items-center justify-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#e8f0ef] text-[#486d6b]">
           <svg
             viewBox="0 0 24 24"
@@ -189,7 +189,7 @@ export default function ProductionChart({
           Consultar valores por mês
         </summary>
 
-        <div className="overflow-x-auto px-4 pb-4">
+        <div tabIndex={0} role="region" aria-label="Tabela de produção" className="overflow-x-auto px-4 pb-4">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">
               Quantidade colhida em quilogramas por mês

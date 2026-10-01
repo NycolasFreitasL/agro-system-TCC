@@ -119,7 +119,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
             Pecuária
           </p>
 
-          <h1 className="mt-1 text-3xl font-bold text-[#123e40]">Animais</h1>
+          <h1 className="mt-1 text-3xl font-bold text-[#244b49]">Animais</h1>
 
           <p className="mt-2 text-sm text-slate-500">
             Consulte o rebanho e acompanhe cada animal.
@@ -129,7 +129,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
         <AnimalModal especies={especies} />
       </header>
 
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Indicador
           titulo="Animais cadastrados"
           valor={animais.length}
@@ -155,7 +155,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="space-y-4 border-b border-slate-200 p-4 sm:p-6">
           <div>
-            <h2 className="font-bold text-[#123e40]">Todos os animais</h2>
+            <h2 className="font-bold text-[#244b49]">Todos os animais</h2>
 
             <p className="mt-1 text-sm text-slate-500">
               Abra o perfil para consultar os detalhes.
@@ -175,7 +175,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
                 value={busca}
                 onChange={(event) => setBusca(event.target.value)}
                 placeholder="Nome, código, espécie ou raça"
-                className="w-full rounded-xl border border-slate-300 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15"
+                className="input input-busca"
               />
             </label>
 
@@ -183,7 +183,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
               aria-label="Filtrar por espécie"
               value={filtroEspecie}
               onChange={(event) => setFiltroEspecie(event.target.value)}
-              className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+              className="input"
             >
               <option value="">Todas as espécies</option>
 
@@ -198,7 +198,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
               aria-label="Filtrar por status"
               value={filtroStatus}
               onChange={(event) => setFiltroStatus(event.target.value)}
-              className="min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+              className="input"
             >
               <option value="">Todos os status</option>
               <option value="ATIVO">Ativos</option>
@@ -224,7 +224,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
         </div>
 
         {filtrados.length === 0 ? (
-          <div className="px-6 py-14 text-center">
+          <div className="estado-vazio m-4 sm:m-6">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-[#486d6b]/10 text-[#486d6b]">
               <Icone tipo="animal" />
             </div>
@@ -243,8 +243,8 @@ export default function AnimaisPainel({ animais, especies }: Props) {
           </div>
         ) : (
           <>
-            <div className="hidden max-w-full overflow-x-auto lg:block">
-              <table className="w-full min-w-[800px] text-left text-sm">
+            <div tabIndex={0} role="region" aria-label="Tabela de animais" className="hidden max-w-full overflow-x-auto lg:block">
+              <table className="w-full min-w-[800px] table-fixed text-left text-sm">
                 <thead className="bg-[#486d6b] text-white">
                   <tr>
                     {[
@@ -402,14 +402,14 @@ function PerfilAnimal({
     >
       <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white p-5 sm:px-7">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#123e40] text-white">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#244b49] text-white">
             <Icone tipo="animal" />
           </div>
 
           <div className="min-w-0">
             <h2
               id={tituloId}
-              className="break-words text-xl font-bold text-[#123e40]"
+              className="break-words text-xl font-bold text-[#244b49]"
             >
               {animal.nome}
             </h2>
@@ -447,7 +447,7 @@ function PerfilAnimal({
           </section>
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="font-semibold text-[#123e40]">Identificação</h3>
+            <h3 className="font-semibold text-[#244b49]">Identificação</h3>
 
             <dl className="mt-4 space-y-4">
               <Dado titulo="Espécie">{animal.especie}</Dado>
@@ -459,7 +459,7 @@ function PerfilAnimal({
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h3 className="font-semibold text-[#123e40]">Situação atual</h3>
+          <h3 className="font-semibold text-[#244b49]">Situação atual</h3>
 
           <dl className="mt-4 grid gap-5 sm:grid-cols-3">
             <Dado titulo="Peso informado">{formatarPeso(animal.peso)}</Dado>
@@ -510,7 +510,7 @@ function PerfilAnimal({
             type="button"
             onClick={fechar}
             disabled={salvandoRegistro}
-            className="rounded-xl bg-[#486d6b] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#365452]"
+            className="rounded-xl bg-[#486d6b] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#244b49]"
           >
             Fechar perfil
           </button>
@@ -621,7 +621,7 @@ function Status({ valor }: { valor: string }) {
       className={
         "inline-flex rounded-full px-3 py-1 text-xs font-medium " +
         (valor === "ATIVO"
-          ? "bg-[#486d6b]/10 text-[#365452]"
+          ? "bg-[#486d6b]/10 text-[#244b49]"
           : "bg-slate-100 text-slate-600")
       }
     >
@@ -657,7 +657,7 @@ function Indicador({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm text-slate-500">{titulo}</p>
-          <p className="mt-2 text-3xl font-bold text-[#123e40]">{valor}</p>
+          <p className="mt-2 text-3xl font-bold text-[#244b49]">{valor}</p>
         </div>
 
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#486d6b]/10 text-[#486d6b]">
