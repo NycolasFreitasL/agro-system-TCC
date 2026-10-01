@@ -1,11 +1,19 @@
 import { prisma } from "@/app/lib/prisma";
+import {
+  exigirUsuario,
+  ErroAutenticacao,
+} from "@/app/lib/sessao";
 
 class ErroValidacao extends Error {}
 
 export async function POST(request: Request) {
   try {
+    await exigirUsuario();
+
     const dados = await request.json().catch(() => {
-      throw new ErroValidacao("Os dados enviados são inválidos.");
+      throw new ErroValidacao(
+        "Os dados enviados são inválidos.",
+      );
     });
 
     if (
@@ -13,25 +21,33 @@ export async function POST(request: Request) {
       typeof dados !== "object" ||
       Array.isArray(dados)
     ) {
-      throw new ErroValidacao("Os dados enviados são inválidos.");
+      throw new ErroValidacao(
+        "Os dados enviados são inválidos.",
+      );
     }
 
     if (
       typeof dados.idPlantio !== "number" &&
       typeof dados.idPlantio !== "string"
     ) {
-      throw new ErroValidacao("Informe um plantio válido.");
+      throw new ErroValidacao(
+        "Informe um plantio válido.",
+      );
     }
 
     const idPlantio = Number(dados.idPlantio);
 
-    if (!Number.isSafeInteger(idPlantio) || idPlantio <= 0) {
-      throw new ErroValidacao("Informe um plantio válido.");
+    if (
+      !Number.isSafeInteger(idPlantio) ||
+      idPlantio <= 0
+    ) {
+      throw new ErroValidacao(
+        "Informe um plantio válido.",
+      );
     }
 
     await prisma.$transaction(async (tx) => {
-      // Usa o mesmo bloqueio da API de colheitas.
-      // Assim, colher e encerrar não acontecem ao mesmo tempo.
+      // Mesmo bloqueio usado na API de colheitas.
       await tx.$queryRaw`
         SELECT id_plantio
         FROM plantio
@@ -46,10 +62,12 @@ export async function POST(request: Request) {
       });
 
       if (!plantio) {
-        throw new ErroValidacao("Plantio não encontrado.");
+        throw new ErroValidacao(
+          "Plantio não encontrado.",
+        );
       }
 
-      // Permite repetir a requisição sem encerrar duas vezes.
+      // Repetir a requisição não altera um cultivo já concluído.
       if (
         plantio.status_plantio === "CONCLUIDO" ||
         plantio.status_plantio === "CONCLUÍDO"
@@ -92,6 +110,13 @@ export async function POST(request: Request) {
       message: "Cultivo concluído. A área foi liberada.",
     });
   } catch (error) {
+    if (error instanceof ErroAutenticacao) {
+      return Response.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+
     if (error instanceof ErroValidacao) {
       return Response.json(
         { error: error.message },
@@ -102,7 +127,9 @@ export async function POST(request: Request) {
     console.error("Erro ao encerrar cultivo:", error);
 
     return Response.json(
-      { error: "Não foi possível encerrar o cultivo." },
+      {
+        error: "Não foi possível encerrar o cultivo.",
+      },
       { status: 500 },
     );
   }

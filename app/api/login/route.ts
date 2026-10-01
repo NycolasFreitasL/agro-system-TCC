@@ -1,43 +1,94 @@
-import {prisma} from "@/app/lib/prisma";
+import { prisma } from "@/app/lib/prisma";
+import { criarSessao } from "@/app/lib/sessao";
 import bcrypt from "bcrypt";
-import { error } from "next/dist/build/output/log";
 
-// Handle POST requests para login do usuario
-export async function POST(req: Request) {
-    const { email, password } = await req.json(); 
+export const runtime = "nodejs";
 
+export async function POST(request: Request) {
+  try {
+    const dados = await request.json().catch(() => null);
 
-  //verifica se nenhum dos campos está vazio, caso esteja retorna um erro
+    if (
+      !dados ||
+      typeof dados !== "object" ||
+      Array.isArray(dados)
+    ) {
+      return Response.json(
+        { error: "Os dados enviados são inválidos." },
+        { status: 400 },
+      );
+    }
+
+    const email =
+      typeof dados.email === "string"
+        ? dados.email.trim()
+        : "";
+
+    const password =
+      typeof dados.password === "string"
+        ? dados.password
+        : "";
+
     if (!email || !password) {
-        return new Response(JSON.stringify({ error: "Email e senha são obrigatórios" }), { status: 400 });
+      return Response.json(
+        { error: "E-mail e senha são obrigatórios." },
+        { status: 400 },
+      );
+    }
+
+    if (email.length > 150 || password.length > 250) {
+      return Response.json(
+        { error: "E-mail ou senha inválidos." },
+        { status: 400 },
+      );
     }
 
     const usuario = await prisma.usuarios.findUnique({
-
-        where: {
-            email: email,
-            }
+      where: {
+        email,
+      },
+      select: {
+        id_usuario: true,
+        senha: true,
+      },
     });
 
+    // A resposta não revela se o e-mail está cadastrado.
     if (!usuario) {
-        return new Response(JSON.stringify({ error: "Usuário não encontrado" }), { status: 404 });
-    };
-
-    // verifica se a senha e o email estão corretos, caso não estejam retorna um erro
-
-    //tirar as "//" depois quando estiver usando o bcrypt para criptografar a senha, por enquanto está assim para teste.
-    const senhaCorreta = await bcrypt.compare(password, usuario.senha);
-
-    
-    //const senhaCorreta = password === usuario.senha;
-
-    const emailValido = usuario.email === email
-
-    if (!senhaCorreta || !emailValido) {
-        console.log("Credenciais inválidas");
-        return new Response(JSON.stringify({error: "Email ou senha incorretos"}), { status: 401 });
-    }else {
-        return new Response(JSON.stringify({message: "Login bem-sucedido"}), { status: 200 });
-        console.log("Login bem-sucedido");
+      return Response.json(
+        { error: "E-mail ou senha incorretos." },
+        { status: 401 },
+      );
     }
+
+    const senhaCorreta = await bcrypt.compare(
+      password,
+      usuario.senha,
+    );
+
+    if (!senhaCorreta) {
+      return Response.json(
+        { error: "E-mail ou senha incorretos." },
+        { status: 401 },
+      );
+    }
+
+    await criarSessao(usuario.id_usuario);
+
+    return Response.json(
+      { message: "Login bem-sucedido." },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  } catch (error) {
+    console.error("Erro ao realizar login:", error);
+
+    return Response.json(
+      { error: "Não foi possível entrar. Tente novamente." },
+      { status: 500 },
+    );
+  }
 }

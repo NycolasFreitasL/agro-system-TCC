@@ -1,14 +1,12 @@
-"use client";
+import { redirect } from "next/navigation";
+import { obterUsuarioAtual } from "@/app/lib/sessao";
 
-import Image from "next/image";
-import Link from "next/link";
+export default async function HomePage() {
+  const usuario = await obterUsuarioAtual();
 
-export default function Home() {
-  return (
-    <div>
-      <main>
-        <Link href="/dashboard"> dashboard </Link>
-      </main>
-    </div>
-  );
+  if (!usuario) {
+    redirect("/login");
+  }
+
+  redirect("/dashboard");
 }

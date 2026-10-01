@@ -1,4 +1,8 @@
 import { prisma } from "@/app/lib/prisma";
+import {
+  exigirUsuario,
+  ErroAutenticacao,
+} from "@/app/lib/sessao";
 
 class ErroValidacao extends Error {}
 
@@ -26,7 +30,8 @@ function dataAtual() {
 function lerData(valor: unknown): Date | null {
   if (
     typeof valor !== "string" ||
-    !/^\d{4}-\d{2}-\d{2}$/.test(valor)
+    !/^\d{4}-\d{2}-\d{2}$/.test(valor) ||
+    valor.startsWith("0000-")
   ) {
     return null;
   }
@@ -60,7 +65,6 @@ function lerId(valor: unknown) {
   return id;
 }
 
-// Converte a quantidade recebida para centésimos de kg.
 function quantidadeEmCentesimos(
   valor: unknown,
   unidade: unknown,
@@ -69,7 +73,9 @@ function quantidadeEmCentesimos(
     typeof valor !== "string" &&
     typeof valor !== "number"
   ) {
-    throw new ErroValidacao("Informe a quantidade colhida.");
+    throw new ErroValidacao(
+      "Informe a quantidade colhida.",
+    );
   }
 
   const texto = String(valor).trim();
@@ -116,8 +122,6 @@ function decimal(centesimos: number) {
   return `${inteiro}.${fracao}`;
 }
 
-// Usa inteiros de precisão arbitrária na soma e na
-// multiplicação de área por produtividade.
 function decimalEmCentesimos(
   valor: string,
   mensagemErro: string,
@@ -142,6 +146,13 @@ function formatarKg(centesimos: bigint) {
 }
 
 function respostaErro(error: unknown) {
+  if (error instanceof ErroAutenticacao) {
+    return Response.json(
+      { error: error.message },
+      { status: error.status },
+    );
+  }
+
   if (error instanceof ErroValidacao) {
     return Response.json(
       { error: error.message },
@@ -152,13 +163,17 @@ function respostaErro(error: unknown) {
   console.error("Erro na API de colheitas:", error);
 
   return Response.json(
-    { error: "Não foi possível processar a colheita." },
+    {
+      error: "Não foi possível processar a colheita.",
+    },
     { status: 500 },
   );
 }
 
 export async function GET(request: Request) {
   try {
+    await exigirUsuario();
+
     const url = new URL(request.url);
     const idPlantio = lerId(
       url.searchParams.get("idPlantio"),
@@ -170,7 +185,13 @@ export async function GET(request: Request) {
       },
     });
 
-    if (!plantio || plantio.id_cultura === null) {
+    if (!plantio) {
+      throw new ErroValidacao(
+        "Plantio não encontrado.",
+      );
+    }
+
+    if (plantio.id_cultura === null) {
       throw new ErroValidacao(
         "O plantio precisa estar vinculado a uma cultura.",
       );
@@ -227,6 +248,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const usuario = await exigirUsuario();
+
     const dados = await request.json().catch(() => {
       throw new ErroValidacao(
         "Os dados enviados são inválidos.",
@@ -249,7 +272,9 @@ export async function POST(request: Request) {
     const dataColheita = lerData(dados.data);
 
     if (!dataColheita) {
-      throw new ErroValidacao("Informe uma data válida.");
+      throw new ErroValidacao(
+        "Informe uma data válida.",
+      );
     }
 
     const dataColheitaTexto = dataColheita
@@ -268,6 +293,16 @@ export async function POST(request: Request) {
     );
 
     const quantidadeKg = decimal(centesimos);
+
+    if (
+      dados.observacao !== undefined &&
+      dados.observacao !== null &&
+      typeof dados.observacao !== "string"
+    ) {
+      throw new ErroValidacao(
+        "A observação é inválida.",
+      );
+    }
 
     const observacao =
       typeof dados.observacao === "string"
@@ -299,7 +334,9 @@ export async function POST(request: Request) {
       });
 
       if (!plantio) {
-        throw new ErroValidacao("Plantio não encontrado.");
+        throw new ErroValidacao(
+          "Plantio não encontrado.",
+        );
       }
 
       if (
@@ -329,6 +366,14 @@ export async function POST(request: Request) {
         );
       }
 
+      // Mantém os dados do produto estáveis durante a entrada.
+      await tx.$queryRaw`
+        SELECT id_produto
+        FROM produto
+        WHERE id_produto = ${idProdutoDestino}
+        FOR UPDATE
+      `;
+
       const produto = await tx.produto.findUnique({
         where: {
           id_produto: idProdutoDestino,
@@ -347,7 +392,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // Confere os dados necessários para as estimativas.
       if (plantio.area_plantada === null) {
         throw new ErroValidacao(
           "Informe a área ocupada por este plantio antes de registrar a colheita.",
@@ -389,7 +433,6 @@ export async function POST(request: Request) {
 
       const alertas: string[] = [];
 
-      // Calcula dias de calendário usando o mesmo horário UTC.
       const inicio = lerData(inicioTexto);
 
       if (!inicio) {
@@ -409,8 +452,7 @@ export async function POST(request: Request) {
         );
       }
 
-      // Inclui todas as colheitas já registradas no plantio,
-      // independentemente da data ou do produto de destino.
+      // Soma todas as colheitas anteriores desse plantio.
       const colheitasAnteriores = await tx.colheita.findMany({
         where: {
           id_plantio: idPlantio,
@@ -448,13 +490,11 @@ export async function POST(request: Request) {
       const totalComNovaColheita =
         totalAnteriorCentesimos + BigInt(centesimos);
 
-      // Área e produtividade estão multiplicadas por 100.
-      // A comparação preserva a precisão sem usar floats.
+      // Mantém precisão na comparação entre área e produtividade.
       const referenciaEscalada =
         areaCentesimos * produtividadeCentesimos;
 
       if (totalComNovaColheita * CEM > referenciaEscalada) {
-        // Arredondamento apenas para exibir a referência.
         const referenciaCentesimos =
           (referenciaEscalada + BigInt(50)) / CEM;
 
@@ -463,8 +503,6 @@ export async function POST(request: Request) {
         );
       }
 
-      // O modal existente já envia o campo Observação.
-      // Fora das referências, esse texto é a justificativa.
       const tamanhoJustificativa = observacao.replace(
         /\s+/g,
         " ",
@@ -476,18 +514,6 @@ export async function POST(request: Request) {
       ) {
         throw new ErroValidacao(
           `${alertas.join(" ")} Para continuar, explique o motivo no campo Observação, com pelo menos 10 caracteres.`,
-        );
-      }
-
-      const usuario = await tx.usuarios.findFirst({
-        orderBy: {
-          id_usuario: "asc",
-        },
-      });
-
-      if (!usuario) {
-        throw new ErroValidacao(
-          "Cadastre pelo menos um usuário.",
         );
       }
 

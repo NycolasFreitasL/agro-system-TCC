@@ -184,6 +184,7 @@ model vacinacao {
   id_produto  Int
   data_vacina DateTime @db.Date
   dose_vacina Decimal? @db.Decimal(5, 2)
+  unidade_dose String? @db.VarChar(20)
   observacao  String?  @db.VarChar(255)
   id_usuario  Int
   animal      animal   @relation(fields: [id_animal], references: [id_animal], onDelete: NoAction, onUpdate: NoAction, map: "fk_vacinacao_animal")
@@ -206,4 +207,15 @@ model cultura {
   atualizado_em           DateTime  @default(now()) @db.Timestamp(6)
   plantio                 plantio[]
   produto                 produto[]
+}
+
+model fazenda {
+  id_fazenda    Int      @id(map: "pk_fazenda") @default(1)
+  nome_fazenda  String   @db.VarChar(100)
+  municipio     String?  @db.VarChar(100)
+  uf            String?  @db.Char(2)
+  endereco      String?  @db.VarChar(200)
+  telefone      String?  @db.VarChar(20)
+  criado_em     DateTime @default(now()) @db.Timestamptz(6)
+  atualizado_em DateTime @default(now()) @updatedAt @db.Timestamptz(6)
 }

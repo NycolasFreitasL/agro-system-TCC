@@ -1,8 +1,12 @@
 "use client";
 
 import {
+  type ChangeEvent,
+  type FormEvent,
   type ReactNode,
   useEffect,
+  useId,
+  useRef,
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -16,72 +20,191 @@ type AnimalModalProps = {
   especies: Especie[];
 };
 
-type CampoProps = {
-  titulo: string;
-  obrigatorio?: boolean;
-  children: ReactNode;
-};
+const estiloCampo =
+  "w-full min-w-0 rounded-xl border border-slate-300 bg-white " +
+  "px-3 py-2.5 text-sm text-slate-800 outline-none transition " +
+  "focus:border-[#486d6b] focus:ring-2 focus:ring-[#486d6b]/15 " +
+  "disabled:bg-slate-100 disabled:opacity-70";
+
+function hojeEmSaoPaulo() {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+
+  const parte = (tipo: string) =>
+    partes.find((item) => item.type === tipo)!.value;
+
+  return `${parte("year")}-${parte("month")}-${parte("day")}`;
+}
 
 export default function AnimalModal({
   especies,
 }: AnimalModalProps) {
-  const [modalAberto, setModalAberto] = useState(false);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState("");
-
   const router = useRouter();
 
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const arquivoRef = useRef<HTMLInputElement>(null);
+  const enviandoRef = useRef(false);
+
+  const tituloId = useId();
+
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
+  const [previa, setPrevia] = useState("");
+  const [hoje, setHoje] = useState("");
+
+  useEffect(() => {
+    if (!foto) {
+      setPrevia("");
+      return;
+    }
+
+    const endereco = URL.createObjectURL(foto);
+    setPrevia(endereco);
+
+    return () => {
+      URL.revokeObjectURL(endereco);
+    };
+  }, [foto]);
+
+  useEffect(() => {
+    if (!aberto) {
+      return;
+    }
+
+    const dialog = dialogRef.current;
+
+    if (!dialog) {
+      return;
+    }
+
+    const overflowAnterior = document.body.style.overflow;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      dialog.close();
+      document.body.style.overflow = overflowAnterior;
+    };
+  }, [aberto]);
+
+  function abrirModal() {
+    setErro("");
+    setFoto(null);
+    setHoje(hojeEmSaoPaulo());
+    setAberto(true);
+  }
+
   function fecharModal() {
-    if (carregando) {
+    if (enviandoRef.current) {
+      return;
+    }
+
+    setAberto(false);
+    setErro("");
+    setFoto(null);
+  }
+
+  function selecionarFoto(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const arquivo = event.target.files?.[0];
+
+    if (!arquivo) {
       return;
     }
 
     setErro("");
-    setModalAberto(false);
+
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(
+        arquivo.type,
+      )
+    ) {
+      event.target.value = "";
+      setFoto(null);
+      setErro("Selecione uma foto JPG, PNG ou WebP.");
+      return;
+    }
+
+    if (
+      arquivo.size === 0 ||
+      arquivo.size > 2 * 1024 * 1024
+    ) {
+      event.target.value = "";
+      setFoto(null);
+      setErro("A foto deve ter até 2 MB.");
+      return;
+    }
+
+    setFoto(arquivo);
+  }
+
+  function removerFoto() {
+    setFoto(null);
+
+    if (arquivoRef.current) {
+      arquivoRef.current.value = "";
+    }
   }
 
   async function cadastrarAnimal(
-    event: React.FormEvent<HTMLFormElement>,
+    event: FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
-    const formulario = event.currentTarget;
-    const formData = new FormData(formulario);
+    if (enviandoRef.current) {
+      return;
+    }
 
+    const formulario = event.currentTarget;
+    const dadosFormulario = new FormData(formulario);
+
+    // Usa o arquivo que passou pela validação da prévia.
+    dadosFormulario.delete("foto");
+
+    if (foto) {
+      dadosFormulario.set("foto", foto);
+    }
+
+    enviandoRef.current = true;
     setCarregando(true);
     setErro("");
 
     try {
       const resposta = await fetch("/api/animais", {
         method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          nome: formData.get("nome"),
-          especie: formData.get("especie"),
-          raca: formData.get("raca"),
-          sexo: formData.get("sexo"),
-          nascimento: formData.get("nascimento"),
-          peso: formData.get("peso"),
-          saude: formData.get("saude"),
-        }),
+        body: dadosFormulario,
       });
 
-      const dados = await resposta.json();
+      const dados = await resposta.json().catch(() => null);
 
       if (!resposta.ok) {
         throw new Error(
-          dados.error ||
-            "Não foi possível cadastrar o animal.",
+          typeof dados?.error === "string"
+            ? dados.error
+            : "Não foi possível cadastrar o animal.",
+        );
+      }
+
+      if (!dados?.animal?.id_animal) {
+        throw new Error(
+          "O servidor retornou uma resposta inesperada. Confira a listagem antes de tentar novamente.",
         );
       }
 
       formulario.reset();
-      setModalAberto(false);
-
+      setFoto(null);
+      setAberto(false);
       router.refresh();
     } catch (error) {
       setErro(
@@ -90,247 +213,286 @@ export default function AnimalModal({
           : "Ocorreu um erro inesperado.",
       );
     } finally {
+      enviandoRef.current = false;
       setCarregando(false);
     }
   }
-
-  useEffect(() => {
-    function fecharComEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        fecharModal();
-      }
-    }
-
-    if (modalAberto) {
-      window.addEventListener(
-        "keydown",
-        fecharComEscape,
-      );
-    }
-
-    return () => {
-      window.removeEventListener(
-        "keydown",
-        fecharComEscape,
-      );
-    };
-  }, [modalAberto, carregando]);
-
-  useEffect(() => {
-    document.body.style.overflow = modalAberto
-      ? "hidden"
-      : "auto";
-
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, [modalAberto]);
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setModalAberto(true)}
-        className="rounded-xl bg-green-800 px-5 py-3 font-semibold text-white transition hover:bg-green-900"
+        onClick={abrirModal}
+        className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#365452]"
       >
-        + Novo animal
+        <Icone tipo="adicionar" />
+        Novo animal
       </button>
 
-      {modalAberto && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onMouseDown={fecharModal}
+      {aberto && (
+        <dialog
+          ref={dialogRef}
+          aria-labelledby={tituloId}
+          onCancel={(event) => {
+            event.preventDefault();
+            fecharModal();
+          }}
+          className="fixed inset-0 m-auto max-h-[92dvh] w-[94vw] max-w-3xl overflow-y-auto rounded-2xl border-0 bg-[#f5f5f5] p-0 text-slate-800 shadow-2xl backdrop:bg-slate-950/50"
         >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="titulo-modal-animal"
-            className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-            onMouseDown={(event) =>
-              event.stopPropagation()
-            }
-          >
-            <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white p-6">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wider text-green-700">
-                  Pecuária
-                </p>
+          <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-5 sm:px-7">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#486d6b]">
+                Pecuária
+              </p>
 
-                <h2
-                  id="titulo-modal-animal"
-                  className="mt-1 text-2xl font-bold text-slate-900"
-                >
-                  Cadastrar novo animal
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Adicione um animal ao rebanho.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                aria-label="Fechar modal"
-                onClick={fecharModal}
-                disabled={carregando}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-slate-500 transition hover:bg-slate-100 disabled:opacity-50"
+              <h2
+                id={tituloId}
+                className="mt-1 text-xl font-bold text-[#123e40] sm:text-2xl"
               >
-                ×
-              </button>
-            </header>
+                Cadastrar animal
+              </h2>
 
-            <form
-              onSubmit={cadastrarAnimal}
-              className="p-6"
+              <p className="mt-1 text-sm text-slate-500">
+                Preencha os dados de identificação do animal.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={fecharModal}
+              disabled={carregando}
+              aria-label="Fechar cadastro"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"
             >
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <Campo
-                  titulo="Nome do animal"
-                  obrigatorio
-                >
-                  <input
-                    name="nome"
-                    required
-                    maxLength={100}
-                    placeholder="Ex.: Estrela"
-                    className="input"
-                  />
-                </Campo>
+              <Icone tipo="fechar" />
+            </button>
+          </header>
 
-                <Campo titulo="Espécie" obrigatorio>
-                  <select
-                    name="especie"
-                    required
-                    defaultValue=""
-                    className="input"
-                  >
-                    <option value="" disabled>
-                      Selecione a espécie
-                    </option>
+          <form
+            onSubmit={cadastrarAnimal}
+            className="space-y-5 p-4 sm:p-7"
+            aria-busy={carregando}
+          >
+            <fieldset
+              disabled={carregando}
+              className="min-w-0 space-y-5"
+            >
+              <section className="rounded-xl border border-slate-200 bg-white p-5">
+                <h3 className="font-semibold text-[#123e40]">
+                  Foto do animal
+                </h3>
 
-                    {especies.map((especie) => (
-                      <option
-                        key={especie.id_especie}
-                        value={especie.id_especie}
+                <div className="mt-4 flex flex-col gap-5 sm:flex-row sm:items-center">
+                  <div className="flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    {previa ? (
+                      // Prévia local do arquivo selecionado.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={previa}
+                        alt="Prévia da foto do animal"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-slate-400">
+                        <Icone
+                          tipo="camera"
+                          className="h-9 w-9"
+                        />
+                        <span className="text-xs">
+                          Sem foto
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <input
+                      ref={arquivoRef}
+                      type="file"
+                      name="foto"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={selecionarFoto}
+                      aria-label="Selecionar foto do animal"
+                      className="hidden"
+                    />
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => arquivoRef.current?.click()}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#486d6b] px-4 py-2 text-sm font-semibold text-[#486d6b] hover:bg-[#486d6b]/5"
                       >
-                        {especie.nome_especie}
+                        <Icone tipo="camera" />
+                        {foto ? "Trocar foto" : "Selecionar foto"}
+                      </button>
+
+                      {foto && (
+                        <button
+                          type="button"
+                          onClick={removerFoto}
+                          className="rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                        >
+                          Remover
+                        </button>
+                      )}
+                    </div>
+
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      Opcional. JPG, PNG ou WebP, até 2 MB.
+                    </p>
+
+                    {foto && (
+                      <p className="mt-1 break-all text-xs text-slate-600">
+                        {foto.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-slate-200 bg-white p-5">
+                <h3 className="font-semibold text-[#123e40]">
+                  Identificação
+                </h3>
+
+                <div className="mt-5 grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
+                  <Campo titulo="Nome do animal" obrigatorio>
+                    <input
+                      name="nome"
+                      required
+                      maxLength={100}
+                      placeholder="Ex.: Estrela"
+                      className={estiloCampo}
+                    />
+                  </Campo>
+
+                  <Campo titulo="Espécie" obrigatorio>
+                    <select
+                      name="especie"
+                      required
+                      defaultValue=""
+                      className={estiloCampo}
+                    >
+                      <option value="" disabled>
+                        Selecione a espécie
                       </option>
-                    ))}
-                  </select>
-                </Campo>
 
-                <Campo titulo="Raça">
-                  <input
-                    name="raca"
-                    maxLength={60}
-                    placeholder="Ex.: Nelore"
-                    className="input"
-                  />
-                </Campo>
+                      {especies.map((especie) => (
+                        <option
+                          key={especie.id_especie}
+                          value={especie.id_especie}
+                        >
+                          {especie.nome_especie}
+                        </option>
+                      ))}
+                    </select>
+                  </Campo>
 
-                <Campo titulo="Sexo" obrigatorio>
-                  <select
-                    name="sexo"
-                    required
-                    defaultValue=""
-                    className="input"
-                  >
-                    <option value="" disabled>
-                      Selecione o sexo
-                    </option>
+                  <Campo titulo="Raça">
+                    <input
+                      name="raca"
+                      maxLength={60}
+                      placeholder="Ex.: Nelore"
+                      className={estiloCampo}
+                    />
+                  </Campo>
 
-                    <option value="M">Macho</option>
-                    <option value="F">Fêmea</option>
-                  </select>
-                </Campo>
+                  <Campo titulo="Sexo" obrigatorio>
+                    <select
+                      name="sexo"
+                      required
+                      defaultValue=""
+                      className={estiloCampo}
+                    >
+                      <option value="" disabled>
+                        Selecione
+                      </option>
+                      <option value="M">Macho</option>
+                      <option value="F">Fêmea</option>
+                    </select>
+                  </Campo>
 
-                <Campo titulo="Data de nascimento">
-                  <input
-                    name="nascimento"
-                    type="date"
-                    className="input"
-                  />
-                </Campo>
+                  <Campo titulo="Data de nascimento">
+                    <input
+                      name="nascimento"
+                      type="date"
+                      max={hoje || undefined}
+                      className={estiloCampo}
+                    />
+                  </Campo>
 
-                <Campo titulo="Peso atual">
-                  <div className="relative">
+                  <Campo titulo="Peso atual (kg)">
                     <input
                       name="peso"
                       type="number"
-                      min="0"
+                      min="0.01"
+                      max="9999.99"
                       step="0.01"
-                      placeholder="0,00"
-                      className="input pr-12"
+                      placeholder="Não informado"
+                      className={estiloCampo}
                     />
+                  </Campo>
 
-                    <span className="pointer-events-none absolute right-4 top-3 text-sm text-slate-400">
-                      kg
-                    </span>
-                  </div>
-                </Campo>
+                  <Campo titulo="Condição de saúde">
+                    <select
+                      name="saude"
+                      defaultValue="SAUDÁVEL"
+                      className={estiloCampo}
+                    >
+                      <option value="SAUDÁVEL">
+                        Saudável
+                      </option>
+                      <option value="EM OBSERVAÇÃO">
+                        Em observação
+                      </option>
+                      <option value="EM TRATAMENTO">
+                        Em tratamento
+                      </option>
+                    </select>
+                  </Campo>
+                </div>
+              </section>
+            </fieldset>
 
-                <Campo titulo="Condição de saúde">
-                  <select
-                    name="saude"
-                    defaultValue="SAUDÁVEL"
-                    className="input"
-                  >
-                    <option value="SAUDÁVEL">
-                      Saudável
-                    </option>
+            {especies.length === 0 && (
+              <p className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+                Cadastre uma espécie ativa antes de adicionar
+                animais.
+              </p>
+            )}
 
-                    <option value="EM OBSERVAÇÃO">
-                      Em observação
-                    </option>
+            {erro && (
+              <p
+                role="alert"
+                className="rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700"
+              >
+                {erro}
+              </p>
+            )}
 
-                    <option value="EM TRATAMENTO">
-                      Em tratamento
-                    </option>
-                  </select>
-                </Campo>
-              </div>
+            <footer className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={fecharModal}
+                disabled={carregando}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
 
-              {especies.length === 0 && (
-                <p className="mt-6 rounded-xl bg-yellow-50 p-4 text-sm font-medium text-yellow-800">
-                  Não existem espécies ativas cadastradas.
-                </p>
-              )}
-
-              {erro && (
-                <p
-                  role="alert"
-                  className="mt-6 rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700"
-                >
-                  {erro}
-                </p>
-              )}
-
-              <footer className="mt-8 flex flex-col-reverse gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={fecharModal}
-                  disabled={carregando}
-                  className="rounded-xl border border-slate-300 px-5 py-3 font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={
-                    carregando ||
-                    especies.length === 0
-                  }
-                  className="rounded-xl bg-green-800 px-6 py-3 font-semibold text-white transition hover:bg-green-900 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {carregando
-                    ? "Cadastrando..."
-                    : "Cadastrar animal"}
-                </button>
-              </footer>
-            </form>
-          </div>
-        </div>
+              <button
+                type="submit"
+                disabled={carregando || especies.length === 0}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#486d6b] px-6 py-3 text-sm font-semibold text-white hover:bg-[#365452] disabled:cursor-wait disabled:opacity-60"
+              >
+                {!carregando && <Icone tipo="adicionar" />}
+                {carregando
+                  ? "Salvando cadastro..."
+                  : "Cadastrar animal"}
+              </button>
+            </footer>
+          </form>
+        </dialog>
       )}
     </>
   );
@@ -340,12 +502,15 @@ function Campo({
   titulo,
   obrigatorio = false,
   children,
-}: CampoProps) {
+}: {
+  titulo: string;
+  obrigatorio?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <label className="block">
-      <span className="text-sm font-semibold text-slate-700">
+    <label className="block min-w-0">
+      <span className="text-sm font-medium text-slate-700">
         {titulo}
-
         {obrigatorio && (
           <span className="ml-1 text-red-500">*</span>
         )}
@@ -353,5 +518,41 @@ function Campo({
 
       <div className="mt-2">{children}</div>
     </label>
+  );
+}
+
+function Icone({
+  tipo,
+  className = "h-5 w-5",
+}: {
+  tipo: "adicionar" | "fechar" | "camera";
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {tipo === "adicionar" && (
+        <path d="M12 5v14M5 12h14" />
+      )}
+
+      {tipo === "fechar" && (
+        <path d="m6 6 12 12M18 6 6 18" />
+      )}
+
+      {tipo === "camera" && (
+        <>
+          <path d="M8 5 6.5 8H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2.5L16 5Z" />
+          <circle cx="12" cy="14" r="4" />
+        </>
+      )}
+    </svg>
   );
 }

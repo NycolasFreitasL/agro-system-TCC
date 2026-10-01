@@ -1,4 +1,8 @@
 import { prisma } from "@/app/lib/prisma";
+import {
+  exigirUsuario,
+  ErroAutenticacao,
+} from "@/app/lib/sessao";
 
 class ErroValidacao extends Error {
   constructor(
@@ -55,7 +59,10 @@ function lerQuantidade(
 }
 
 function responderErro(error: unknown) {
-  if (error instanceof ErroValidacao) {
+  if (
+    error instanceof ErroAutenticacao ||
+    error instanceof ErroValidacao
+  ) {
     return Response.json(
       { error: error.message },
       { status: error.status },
@@ -65,15 +72,17 @@ function responderErro(error: unknown) {
   console.error("Erro na API de produtos:", error);
 
   return Response.json(
-    { error: "Não foi possível processar a solicitação." },
+    {
+      error: "Não foi possível processar a solicitação.",
+    },
     { status: 500 },
   );
 }
 
-// O modal consulta as culturas sem precisar alterar
-// as propriedades recebidas pela página de estoque.
 export async function GET() {
   try {
+    await exigirUsuario();
+
     const culturas = await prisma.cultura.findMany({
       where: {
         ativo: true,
@@ -102,6 +111,8 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const usuario = await exigirUsuario();
+
     const dados = await request.json().catch(() => {
       throw new ErroValidacao(
         "Os dados enviados são inválidos.",
@@ -257,8 +268,7 @@ export async function POST(request: Request) {
           );
         }
 
-        // Mantém compatibilidade com a API de colheitas:
-        // categoria Outro + cultura vinculada + unidade KG.
+        // Preserva a compatibilidade com a API de colheitas.
         const categoriaBanco =
           categoria === "Produto colhido"
             ? "Outro"
@@ -275,20 +285,8 @@ export async function POST(request: Request) {
           },
         });
 
-        // O saldo inicial positivo também aparece no histórico.
+        // Registra o saldo inicial com o usuário conectado.
         if (quantidade !== "0.00") {
-          const usuario = await tx.usuarios.findFirst({
-            orderBy: {
-              id_usuario: "asc",
-            },
-          });
-
-          if (!usuario) {
-            throw new ErroValidacao(
-              "Cadastre um usuário antes de informar um saldo inicial.",
-            );
-          }
-
           await tx.move_estoque.create({
             data: {
               id_produto: novoProduto.id_produto,

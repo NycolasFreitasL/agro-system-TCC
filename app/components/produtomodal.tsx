@@ -57,13 +57,11 @@ export default function ProdutoModal() {
   const [unidade, setUnidade] = useState("");
 
   const [culturas, setCulturas] = useState<Cultura[]>([]);
-  const [buscandoCulturas, setBuscandoCulturas] =
-    useState(false);
+  const [buscandoCulturas, setBuscandoCulturas] = useState(false);
   const [erroCulturas, setErroCulturas] = useState("");
 
   const exigeCultura =
-    categoria === "Semente" ||
-    categoria === "Produto colhido";
+    categoria === "Semente" || categoria === "Produto colhido";
 
   const unidadesDisponiveis = UNIDADES.filter((item) => {
     if (categoria === "Produto colhido") {
@@ -71,9 +69,7 @@ export default function ProdutoModal() {
     }
 
     if (categoria === "Semente") {
-      return ["KG", "SACA", "UNIDADE"].includes(
-        item.valor,
-      );
+      return ["KG", "SACA", "UNIDADE"].includes(item.valor);
     }
 
     return true;
@@ -81,9 +77,7 @@ export default function ProdutoModal() {
 
   const culturaIndisponivel =
     exigeCultura &&
-    (buscandoCulturas ||
-      Boolean(erroCulturas) ||
-      culturas.length === 0);
+    (buscandoCulturas || Boolean(erroCulturas) || culturas.length === 0);
 
   function abrirModal() {
     setErro("");
@@ -108,10 +102,7 @@ export default function ProdutoModal() {
     setCategoria(novaCategoria);
     setErro("");
 
-    if (
-      novaCategoria === "Semente" ||
-      novaCategoria === "Produto colhido"
-    ) {
+    if (novaCategoria === "Semente" || novaCategoria === "Produto colhido") {
       setUnidade("KG");
     } else {
       setUnidade("");
@@ -133,8 +124,7 @@ export default function ProdutoModal() {
       dialog.showModal();
     }
 
-    const overflowAnterior =
-      document.body.style.overflow;
+    const overflowAnterior = document.body.style.overflow;
 
     document.body.style.overflow = "hidden";
 
@@ -159,37 +149,27 @@ export default function ProdutoModal() {
       setErroCulturas("");
 
       try {
-        const resposta = await fetch(
-          "/api/estoque/produtos",
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          },
-        );
+        const resposta = await fetch("/api/estoque/produtos", {
+          cache: "no-store",
+          signal: controller.signal,
+        });
 
         if (
-          !resposta.headers
-            .get("content-type")
-            ?.includes("application/json")
+          !resposta.headers.get("content-type")?.includes("application/json")
         ) {
-          throw new Error(
-            "Não foi possível consultar as culturas.",
-          );
+          throw new Error("Não foi possível consultar as culturas.");
         }
 
         const dados = await resposta.json();
 
         if (!resposta.ok) {
           throw new Error(
-            dados.error ||
-              "Não foi possível consultar as culturas.",
+            dados.error || "Não foi possível consultar as culturas.",
           );
         }
 
         if (!Array.isArray(dados.culturas)) {
-          throw new Error(
-            "A consulta de culturas retornou dados inválidos.",
-          );
+          throw new Error("A consulta de culturas retornou dados inválidos.");
         }
 
         if (!controller.signal.aborted) {
@@ -217,15 +197,10 @@ export default function ProdutoModal() {
     };
   }, [modalAberto]);
 
-  async function cadastrarProduto(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function cadastrarProduto(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (
-      enviandoRef.current ||
-      culturaIndisponivel
-    ) {
+    if (enviandoRef.current || culturaIndisponivel) {
       return;
     }
 
@@ -237,43 +212,29 @@ export default function ProdutoModal() {
     setErro("");
 
     try {
-      const resposta = await fetch(
-        "/api/estoque/produtos",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nome: formData.get("nome"),
-            categoria,
-            unidadeMedida: unidade,
-            quantidade: formData.get("quantidade"),
-            estoqueMinimo: formData.get("estoqueMinimo"),
-            idCultura: exigeCultura
-              ? formData.get("idCultura")
-              : null,
-          }),
+      const resposta = await fetch("/api/estoque/produtos", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          nome: formData.get("nome"),
+          categoria,
+          unidadeMedida: unidade,
+          quantidade: formData.get("quantidade"),
+          estoqueMinimo: formData.get("estoqueMinimo"),
+          idCultura: exigeCultura ? formData.get("idCultura") : null,
+        }),
+      });
 
-      if (
-        !resposta.headers
-          .get("content-type")
-          ?.includes("application/json")
-      ) {
-        throw new Error(
-          "A API de produtos não respondeu corretamente.",
-        );
+      if (!resposta.headers.get("content-type")?.includes("application/json")) {
+        throw new Error("A API de produtos não respondeu corretamente.");
       }
 
       const dados = await resposta.json();
 
       if (!resposta.ok) {
-        throw new Error(
-          dados.error ||
-            "Não foi possível cadastrar o produto.",
-        );
+        throw new Error(dados.error || "Não foi possível cadastrar o produto.");
       }
 
       formulario.reset();
@@ -281,9 +242,7 @@ export default function ProdutoModal() {
       router.refresh();
     } catch (error) {
       setErro(
-        error instanceof Error
-          ? error.message
-          : "Ocorreu um erro inesperado.",
+        error instanceof Error ? error.message : "Ocorreu um erro inesperado.",
       );
     } finally {
       enviandoRef.current = false;
@@ -296,7 +255,7 @@ export default function ProdutoModal() {
       <button
         type="button"
         onClick={abrirModal}
-        className="rounded-xl bg-green-800 px-5 py-3 font-semibold text-white transition hover:bg-green-900"
+        className="rounded-xl bg-[#486d6b] px-5 py-3 font-semibold text-white transition hover:bg-[#365553]"
       >
         + Novo produto
       </button>
@@ -314,14 +273,11 @@ export default function ProdutoModal() {
           <>
             <header className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-5 sm:p-6">
               <div className="min-w-0">
-                <p className="text-sm font-semibold uppercase tracking-wider text-green-700">
+                <p className="text-sm font-semibold uppercase tracking-wider text-[#486d6b]">
                   Estoque
                 </p>
 
-                <h2
-                  id={tituloId}
-                  className="mt-1 text-2xl font-bold"
-                >
+                <h2 id={tituloId} className="mt-1 text-2xl font-bold">
                   Cadastrar produto
                 </h2>
 
@@ -341,20 +297,11 @@ export default function ProdutoModal() {
               </button>
             </header>
 
-            <form
-              onSubmit={cadastrarProduto}
-              className="p-5 sm:p-6"
-            >
-              <fieldset
-                disabled={carregando}
-                className="min-w-0"
-              >
+            <form onSubmit={cadastrarProduto} className="p-5 sm:p-6">
+              <fieldset disabled={carregando} className="min-w-0">
                 <div className="grid min-w-0 grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="min-w-0 sm:col-span-2">
-                    <Campo
-                      titulo="Nome do produto"
-                      obrigatorio
-                    >
+                    <Campo titulo="Nome do produto" obrigatorio>
                       <input
                         name="nome"
                         required
@@ -370,11 +317,7 @@ export default function ProdutoModal() {
                       name="categoria"
                       required
                       value={categoria}
-                      onChange={(event) =>
-                        alterarCategoria(
-                          event.target.value,
-                        )
-                      }
+                      onChange={(event) => alterarCategoria(event.target.value)}
                       className="input w-full min-w-0"
                     >
                       <option value="" disabled>
@@ -389,17 +332,12 @@ export default function ProdutoModal() {
                     </select>
                   </Campo>
 
-                  <Campo
-                    titulo="Unidade de medida"
-                    obrigatorio
-                  >
+                  <Campo titulo="Unidade de medida" obrigatorio>
                     <select
                       name="unidadeMedida"
                       required
                       value={unidade}
-                      onChange={(event) =>
-                        setUnidade(event.target.value)
-                      }
+                      onChange={(event) => setUnidade(event.target.value)}
                       className="input w-full min-w-0"
                     >
                       <option value="" disabled>
@@ -407,10 +345,7 @@ export default function ProdutoModal() {
                       </option>
 
                       {unidadesDisponiveis.map((item) => (
-                        <option
-                          key={item.valor}
-                          value={item.valor}
-                        >
+                        <option key={item.valor} value={item.valor}>
                           {item.nome}
                         </option>
                       ))}
@@ -419,10 +354,7 @@ export default function ProdutoModal() {
 
                   {exigeCultura && (
                     <div className="min-w-0 sm:col-span-2">
-                      <Campo
-                        titulo="Cultura vinculada"
-                        obrigatorio
-                      >
+                      <Campo titulo="Cultura vinculada" obrigatorio>
                         <select
                           key={categoria}
                           name="idCultura"
@@ -453,12 +385,9 @@ export default function ProdutoModal() {
                       </Campo>
 
                       {erroCulturas && (
-                        <p
-                          role="alert"
-                          className="mt-2 text-sm text-red-700"
-                        >
-                          {erroCulturas} Feche e abra o
-                          formulário para tentar novamente.
+                        <p role="alert" className="mt-2 text-sm text-red-700">
+                          {erroCulturas} Feche e abra o formulário para tentar
+                          novamente.
                         </p>
                       )}
 
@@ -466,9 +395,8 @@ export default function ProdutoModal() {
                         !erroCulturas &&
                         culturas.length === 0 && (
                           <p className="mt-2 text-sm text-amber-700">
-                            Nenhuma cultura ativa encontrada.
-                            É necessário cadastrar ou ativar
-                            uma cultura primeiro.
+                            Nenhuma cultura ativa encontrada. É necessário
+                            cadastrar ou ativar uma cultura primeiro.
                           </p>
                         )}
 
@@ -482,16 +410,12 @@ export default function ProdutoModal() {
 
                   {categoria === "Produto colhido" && (
                     <div className="rounded-xl bg-green-50 p-4 text-sm text-green-900 sm:col-span-2">
-                      O estoque será controlado em kg.
-                      Colheitas informadas em toneladas
-                      serão convertidas automaticamente.
+                      O estoque será controlado em kg. Colheitas informadas em
+                      toneladas serão convertidas automaticamente.
                     </div>
                   )}
 
-                  <Campo
-                    titulo="Quantidade inicial"
-                    obrigatorio
-                  >
+                  <Campo titulo="Quantidade inicial" obrigatorio>
                     <input
                       name="quantidade"
                       type="number"
@@ -504,10 +428,7 @@ export default function ProdutoModal() {
                     />
                   </Campo>
 
-                  <Campo
-                    titulo="Estoque mínimo"
-                    obrigatorio
-                  >
+                  <Campo titulo="Estoque mínimo" obrigatorio>
                     <input
                       name="estoqueMinimo"
                       type="number"
@@ -521,10 +442,9 @@ export default function ProdutoModal() {
                   </Campo>
 
                   <p className="text-sm text-slate-500 sm:col-span-2">
-                    A quantidade inicial representa o saldo
-                    que já existe no estoque. Se for maior
-                    que zero, será registrada uma entrada no
-                    histórico.
+                    A quantidade inicial representa o saldo que já existe no
+                    estoque. Se for maior que zero, será registrada uma entrada
+                    no histórico.
                   </p>
                 </div>
               </fieldset>
@@ -550,14 +470,10 @@ export default function ProdutoModal() {
 
                 <button
                   type="submit"
-                  disabled={
-                    carregando || culturaIndisponivel
-                  }
-                  className="rounded-xl bg-green-800 px-6 py-3 font-semibold text-white hover:bg-green-900 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={carregando || culturaIndisponivel}
+                  className="rounded-xl bg-[#486d6b] px-6 py-3 font-semibold text-white hover:bg-[#365553] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {carregando
-                    ? "Cadastrando..."
-                    : "Cadastrar produto"}
+                  {carregando ? "Cadastrando..." : "Cadastrar produto"}
                 </button>
               </footer>
             </form>
@@ -568,19 +484,13 @@ export default function ProdutoModal() {
   );
 }
 
-function Campo({
-  titulo,
-  obrigatorio = false,
-  children,
-}: CampoProps) {
+function Campo({ titulo, obrigatorio = false, children }: CampoProps) {
   return (
     <label className="block min-w-0">
       <span className="text-sm font-semibold text-slate-700">
         {titulo}
 
-        {obrigatorio && (
-          <span className="ml-1 text-red-500">*</span>
-        )}
+        {obrigatorio && <span className="ml-1 text-red-500">*</span>}
       </span>
 
       <div className="mt-2">{children}</div>
