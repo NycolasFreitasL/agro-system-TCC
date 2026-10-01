@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
-import Sidebar from "../components/sidebar";
+import Sidebar from "./components/sidebar";
 import { obterUsuarioAtual } from "@/app/lib/sessao";
 
 export default async function DashboardLayout({
