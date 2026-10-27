@@ -290,6 +290,7 @@ export async function POST(request: Request) {
 
       if (
         !produto ||
+        !produto.ativo ||
         produto.categoria !== "Semente" ||
         !produto.cultura ||
         !produto.cultura.ativo

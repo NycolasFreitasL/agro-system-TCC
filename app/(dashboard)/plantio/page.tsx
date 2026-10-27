@@ -109,6 +109,7 @@ export default async function PlantioPage() {
 
     prisma.produto.findMany({
       where: {
+        ativo: true,
         categoria: "Semente",
         cultura: {
           is: {

@@ -208,6 +208,7 @@ export async function GET(request: Request) {
 
     const produtos = await prisma.produto.findMany({
       where: {
+        ativo: true,
         id_cultura: plantio.id_cultura,
         categoria: "Outro",
         unidade_medida: {
@@ -382,6 +383,7 @@ export async function POST(request: Request) {
 
       if (
         !produto ||
+        !produto.ativo ||
         produto.id_produto === plantio.id_produto ||
         produto.id_cultura !== plantio.id_cultura ||
         produto.categoria !== "Outro" ||

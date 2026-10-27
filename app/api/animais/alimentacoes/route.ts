@@ -166,6 +166,7 @@ export async function GET(request: Request) {
 
     const produtos = await prisma.produto.findMany({
       where: {
+        ativo: true,
         categoria: {
           equals: "Alimentação",
           mode: "insensitive",
@@ -326,6 +327,13 @@ export async function POST(request: Request) {
         throw new ErroValidacao(
           "Produto não encontrado.",
           404,
+        );
+      }
+
+      if (!produto.ativo) {
+        throw new ErroValidacao(
+          "Produtos arquivados não podem ser usados em novas alimentações.",
+          409,
         );
       }
 

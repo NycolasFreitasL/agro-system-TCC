@@ -74,6 +74,7 @@ export default async function DashboardPage() {
     }),
 
     prisma.produto.findMany({
+      where: { ativo: true },
       select: {
         id_produto: true,
         nome_produto: true,

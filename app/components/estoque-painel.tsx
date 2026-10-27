@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
 import { noMinimoOuAbaixo } from "@/app/lib/estoque-regras";
 import ProdutoModal from "@/app/components/produtomodal";
 import MovimentacaoModal from "@/app/components/movimentacaomodal";
@@ -14,6 +15,7 @@ export type ProdutoEstoque = {
   unidade_medida: string;
   id_cultura: number | null;
   culturaNome: string | null;
+  ativo: boolean;
 };
 
 export type MovimentoEstoque = {
@@ -31,6 +33,7 @@ type Props = {
   produtos: ProdutoEstoque[];
   movimentacoes: MovimentoEstoque[];
   movimentacoesHoje: number;
+  podeAdministrar: boolean;
 };
 
 type Situacao = "NORMAL" | "BAIXO" | "SEM_ESTOQUE";
@@ -99,6 +102,7 @@ export default function EstoquePainel({
   produtos,
   movimentacoes,
   movimentacoesHoje,
+  podeAdministrar,
 }: Props) {
   const filtroId = useId();
   const buscaId = useId();
@@ -106,12 +110,19 @@ export default function EstoquePainel({
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [categoria, setCategoria] = useState("");
   const [status, setStatus] = useState("");
+  const [mostrarArquivados, setMostrarArquivados] = useState(false);
 
-  const categorias = Array.from(new Set(produtos.map(categoriaExibida)))
+  const produtosAtivos = produtos.filter((produto) => produto.ativo);
+  const produtosArquivados = produtos.filter((produto) => !produto.ativo);
+  const produtosVisiveis = podeAdministrar && mostrarArquivados
+    ? produtosArquivados
+    : produtosAtivos;
+
+  const categorias = Array.from(new Set(produtosVisiveis.map(categoriaExibida)))
     .sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const semEstoque = produtos.filter((produto) => situacao(produto) === "SEM_ESTOQUE").length;
-  const noMinimo = produtos.filter((produto) => noMinimoOuAbaixo(produto.quantidade, produto.estoque_min)).length;
-  const produtosFiltrados = produtos.filter((produto) => {
+  const semEstoque = produtosAtivos.filter((produto) => situacao(produto) === "SEM_ESTOQUE").length;
+  const noMinimo = produtosAtivos.filter((produto) => noMinimoOuAbaixo(produto.quantidade, produto.estoque_min)).length;
+  const produtosFiltrados = produtosVisiveis.filter((produto) => {
     const texto = normalizar(`${produto.nome_produto} ${produto.id_produto} ${produto.culturaNome ?? ""}`);
     return texto.includes(normalizar(busca))
       && (!categoria || categoriaExibida(produto) === categoria)
@@ -137,14 +148,14 @@ export default function EstoquePainel({
           <p className="mt-2 text-sm leading-6 text-slate-500">Acompanhe saldos, mínimos e movimentações dos produtos da fazenda.</p>
         </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <MovimentacaoModal produtos={produtos} />
+          <MovimentacaoModal produtos={produtosAtivos} />
           <ProdutoModal />
         </div>
       </header>
 
       <section aria-label="Resumo do estoque" className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-3">
-        <Indicador titulo="Produtos cadastrados" valor={produtos.length.toLocaleString("pt-BR")}
-          descricao="Todos os produtos, inclusive os sem saldo." icone="caixa" />
+        <Indicador titulo="Produtos ativos" valor={produtosAtivos.length.toLocaleString("pt-BR")}
+          descricao="Disponíveis para novas operações." icone="caixa" />
         <Indicador titulo="Produtos em alerta" valor={noMinimo.toLocaleString("pt-BR")}
           descricao={`No mínimo ou abaixo · ${semEstoque} sem estoque`} icone="alerta" alerta />
         <Indicador titulo="Movimentações hoje" valor={movimentacoesHoje.toLocaleString("pt-BR")}
@@ -156,9 +167,23 @@ export default function EstoquePainel({
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h2 id="estoque-produtos-titulo" className="text-base font-semibold text-[#244b49]">Produtos em estoque</h2>
             <p aria-live="polite" aria-atomic="true" className="text-xs text-slate-500">
-              {produtosFiltrados.length} de {produtos.length} produtos
+              {produtosFiltrados.length} de {produtosVisiveis.length} produtos
             </p>
           </div>
+          {podeAdministrar && (
+            <div className="flex flex-wrap gap-2" aria-label="Estado dos produtos">
+              <button type="button" aria-pressed={!mostrarArquivados}
+                onClick={() => { setMostrarArquivados(false); setCategoria(""); setStatus(""); }}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${!mostrarArquivados ? "border-[#486d6b] bg-[#edf4f3] text-[#244b49]" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}>
+                Ativos ({produtosAtivos.length})
+              </button>
+              <button type="button" aria-pressed={mostrarArquivados}
+                onClick={() => { setMostrarArquivados(true); setCategoria(""); setStatus(""); }}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-sm font-medium ${mostrarArquivados ? "border-[#486d6b] bg-[#edf4f3] text-[#244b49]" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}>
+                Arquivados ({produtosArquivados.length})
+              </button>
+            </div>
+          )}
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <label htmlFor={buscaId} className="mb-2 block text-sm font-medium text-slate-700">Buscar produto</label>
@@ -209,10 +234,10 @@ export default function EstoquePainel({
           <div className="p-4 sm:p-5">
             <div className="estado-vazio">
               <span className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#edf4f3] text-[#486d6b]">
-                <Icone nome={produtos.length === 0 ? "caixa" : "busca"} />
+                <Icone nome={produtosVisiveis.length === 0 ? "caixa" : "busca"} />
               </span>
-              <p className="font-medium text-slate-700">{produtos.length === 0 ? "Seu estoque ainda está vazio" : "Nenhum produto encontrado"}</p>
-              <p className="mt-2 text-sm text-slate-500">{produtos.length === 0 ? "Cadastre o primeiro produto em Novo produto para começar." : "Tente outro nome, código ou cultura, ou limpe os filtros."}</p>
+              <p className="font-medium text-slate-700">{produtosVisiveis.length === 0 ? (mostrarArquivados ? "Nenhum produto arquivado" : "Nenhum produto ativo") : "Nenhum produto encontrado"}</p>
+              <p className="mt-2 text-sm text-slate-500">{produtosVisiveis.length === 0 ? (mostrarArquivados ? "Produtos arquivados aparecerão aqui." : "Cadastre o primeiro produto em Novo produto para começar.") : "Tente outro nome, código ou cultura, ou limpe os filtros."}</p>
             </div>
           </div>
         ) : (
@@ -226,7 +251,7 @@ export default function EstoquePainel({
                     <th scope="col" className="w-[15%] px-4 py-3 text-right font-medium">Saldo atual</th>
                     <th scope="col" className="w-[15%] px-4 py-3 text-right font-medium">Estoque mínimo</th>
                     <th scope="col" className="w-[22%] px-4 py-3 font-medium">Situação</th>
-                    <th scope="col" className="w-[18%] px-4 py-3 text-right font-medium">Ação</th>
+                    <th scope="col" className="w-[24%] px-4 py-3 text-right font-medium">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -236,7 +261,7 @@ export default function EstoquePainel({
                       <td className="break-words px-4 py-4 text-right font-medium tabular-nums text-slate-800">{numero(produto.quantidade)} <span className="text-xs font-normal text-slate-500">{unidade(produto.unidade_medida)}</span></td>
                       <td className="break-words px-4 py-4 text-right tabular-nums">{numero(produto.estoque_min)} <span className="text-xs text-slate-500">{unidade(produto.unidade_medida)}</span></td>
                       <td className="px-4 py-4"><Etiqueta produto={produto} /></td>
-                      <td className="px-3 py-4 text-right"><AcaoMovimentar produto={produto} /></td>
+                      <td className="px-3 py-4 text-right"><AcoesProduto produto={produto} podeAdministrar={podeAdministrar} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -258,7 +283,7 @@ export default function EstoquePainel({
                   </dl>
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                     <Etiqueta produto={produto} />
-                    <AcaoMovimentar produto={produto} />
+                    <AcoesProduto produto={produto} podeAdministrar={podeAdministrar} />
                   </div>
                 </li>
               ))}
@@ -312,6 +337,63 @@ function AcaoMovimentar({ produto }: { produto: ProdutoEstoque }) {
     categoria={produto.categoria} estoqueMinimo={produto.estoque_min} />;
 }
 
+function AcoesProduto({ produto, podeAdministrar }: {
+  produto: ProdutoEstoque;
+  podeAdministrar: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+      {produto.ativo && <AcaoMovimentar produto={produto} />}
+      {podeAdministrar && <AcaoArquivamento produto={produto} />}
+    </div>
+  );
+}
+
+function AcaoArquivamento({ produto }: { produto: ProdutoEstoque }) {
+  const router = useRouter();
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const arquivar = produto.ativo;
+
+  async function alterarEstado() {
+    if (salvando || (arquivar && produto.quantidade !== 0)) return;
+
+    const acao = arquivar ? "arquivar" : "reativar";
+    if (!window.confirm(`Deseja ${acao} o produto “${produto.nome_produto}”?`)) return;
+
+    setSalvando(true);
+    setErro("");
+    try {
+      const resposta = await fetch("/api/estoque/produtos/arquivamento", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idProduto: produto.id_produto, ativo: !arquivar }),
+      });
+      const dados = await resposta.json().catch(() => null);
+      if (!resposta.ok) {
+        throw new Error(dados?.error || "Não foi possível atualizar o produto.");
+      }
+      router.refresh();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Não foi possível atualizar o produto.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button type="button" onClick={alterarEstado}
+        disabled={salvando || (arquivar && produto.quantidade !== 0)}
+        title={arquivar && produto.quantidade !== 0 ? "Zere o saldo antes de arquivar." : undefined}
+        className={`min-h-10 rounded-lg border px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${arquivar ? "border-slate-300 text-slate-600 hover:bg-slate-50" : "border-[#486d6b] text-[#486d6b] hover:bg-[#edf4f3]"}`}>
+        {salvando ? "Aguarde..." : arquivar ? "Arquivar" : "Reativar"}
+      </button>
+      {erro && <span role="alert" className="max-w-40 text-left text-xs text-red-700">{erro}</span>}
+    </div>
+  );
+}
+
 function Identificacao({ produto }: { produto: ProdutoEstoque }) {
   return (
     <div className="flex min-w-0 items-start gap-3">
@@ -324,6 +406,7 @@ function Identificacao({ produto }: { produto: ProdutoEstoque }) {
           {categoriaExibida(produto)}{produto.culturaNome ? ` · ${produto.culturaNome}` : ""}
         </p>
         <p className="text-xs leading-5 text-slate-500">Cód. {produto.id_produto}</p>
+        {!produto.ativo && <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Arquivado</span>}
       </div>
     </div>
   );

@@ -143,6 +143,7 @@ export async function POST(request: Request) {
           },
           select: {
             id_produto: true,
+            ativo: true,
             categoria: true,
             unidade_medida: true,
             quantidade: true,
@@ -154,6 +155,13 @@ export async function POST(request: Request) {
           throw new ErroValidacao(
             "Produto não encontrado.",
             404,
+          );
+        }
+
+        if (!produto.ativo) {
+          throw new ErroValidacao(
+            "Produtos arquivados não podem receber novas movimentações.",
+            409,
           );
         }
 

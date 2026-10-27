@@ -72,11 +72,11 @@ function harness(arquivo, { estados = [], globais = {}, dependencias = {} } = {}
   };
 }
 const produtos = [
-  { id_produto: 101, nome_produto: "Café Arábica", categoria: "Semente", quantidade: 3, estoque_min: 2, unidade_medida: "KG", id_cultura: 5, culturaNome: "Café" },
-  { id_produto: 102, nome_produto: "Vacina A", categoria: "Vacina", quantidade: 2, estoque_min: 2, unidade_medida: "Dose", id_cultura: null, culturaNome: null },
-  { id_produto: 103, nome_produto: "Milho colhido", categoria: "Outro", quantidade: 0, estoque_min: 0, unidade_medida: "KG", id_cultura: 4, culturaNome: "Milho" },
-  { id_produto: 104, nome_produto: "Desinfetante", categoria: "Outro", quantidade: 0, estoque_min: 1, unidade_medida: "L", id_cultura: null, culturaNome: null },
-  { id_produto: 105, nome_produto: "Vitamina", categoria: "Alimentação", quantidade: 5, estoque_min: 1, unidade_medida: "Dose", id_cultura: null, culturaNome: null },
+  { id_produto: 101, nome_produto: "Café Arábica", categoria: "Semente", quantidade: 3, estoque_min: 2, unidade_medida: "KG", id_cultura: 5, culturaNome: "Café", ativo: true },
+  { id_produto: 102, nome_produto: "Vacina A", categoria: "Vacina", quantidade: 2, estoque_min: 2, unidade_medida: "Dose", id_cultura: null, culturaNome: null, ativo: true },
+  { id_produto: 103, nome_produto: "Milho colhido", categoria: "Outro", quantidade: 0, estoque_min: 0, unidade_medida: "KG", id_cultura: 4, culturaNome: "Milho", ativo: true },
+  { id_produto: 104, nome_produto: "Desinfetante", categoria: "Outro", quantidade: 0, estoque_min: 1, unidade_medida: "L", id_cultura: null, culturaNome: null, ativo: true },
+  { id_produto: 105, nome_produto: "Vitamina", categoria: "Alimentação", quantidade: 5, estoque_min: 1, unidade_medida: "Dose", id_cultura: null, culturaNome: null, ativo: true },
 ];
 const props = { produtos, movimentacoes: [], movimentacoesHoje: 7 };
 function painel() {
@@ -151,7 +151,7 @@ test("filtros ativos continuam visíveis e podem ser limpos com painel recolhido
 test("estoque vazio e pesquisa sem resultados oferecem mensagens distintas", () => {
   const h = painel();
   const vazio = h.render({ ...props, produtos: [] });
-  assert.ok(texto(vazio.arvore).includes("Seu estoque ainda está vazio"));
+  assert.ok(texto(vazio.arvore).includes("Nenhum produto ativo"));
   const preenchido = h.render(props);
   preenchido.elementos.find((n) => n.type === "input" && n.props.type === "search").props.onChange({ target: { value: "inexistente" } });
   const semResultado = h.render(props);
@@ -274,4 +274,19 @@ test("prévia de saldo mantém entrada/saída sem gravação e respeita Dose int
   assert.equal(campoQuantidade.props.step, "1");
   campoQuantidade.props.onChange({ target: { value: "0.5" } });
   assert.equal(h.render(modalProps).elementos.find((n) => n.props.type === "submit").props.disabled, true);
+});
+
+test("proprietário consulta arquivados e pode reativá-los sem oferecer movimentação", () => {
+  const h = painel();
+  const arquivado = { ...produtos[2], ativo: false };
+  const propsAdmin = { ...props, produtos: [produtos[0], arquivado], podeAdministrar: true };
+  const ativos = h.render(propsAdmin);
+  assert.deepEqual(ids(ativos), [101]);
+  ativos.elementos.find((n) => n.type === "button" && n.props["aria-pressed"] === false)
+    .props.onClick();
+  const historico = h.render(propsAdmin);
+  assert.deepEqual(ids(historico), [103]);
+  assert.ok(texto(historico.arvore).includes("Arquivado"));
+  assert.ok(historico.elementos.some((n) => n.type === "button" && texto(n).trim() === "Reativar"));
+  assert.ok(!historico.elementos.some((n) => n.type === "button" && texto(n).includes("Movimentar")));
 });

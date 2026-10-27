@@ -48,6 +48,7 @@ export default async function AnimaisPage() {
   return (
     <AnimaisPainel
       especies={especies}
+      podeAdministrar={usuario.permissao_usuario === "PROPRIETARIO"}
       animais={animais.map((animal) => ({
         id: animal.id_animal,
         nome: animal.nome_animal,

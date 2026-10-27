@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import AnimalModal from "@/app/components/animalmodal";
 import AnimalHistorico from "@/app/components/animal-historico";
 import AnimalAlimentacao from "@/app/components/animal-alimentacao";
@@ -24,6 +25,7 @@ type Animal = {
 
 type Props = {
   animais: Animal[];
+  podeAdministrar: boolean;
   especies: {
     id_especie: number;
     nome_especie: string;
@@ -66,10 +68,10 @@ function formatarSexo(sexo: string) {
   return "Não informado";
 }
 
-export default function AnimaisPainel({ animais, especies }: Props) {
+export default function AnimaisPainel({ animais, especies, podeAdministrar }: Props) {
   const [busca, setBusca] = useState("");
   const [filtroEspecie, setFiltroEspecie] = useState("");
-  const [filtroStatus, setFiltroStatus] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("ATIVO");
   const [selecionadoId, setSelecionadoId] = useState<number | null>(null);
 
   const especiesDisponiveis = Array.from(
@@ -97,7 +99,9 @@ export default function AnimaisPainel({ animais, especies }: Props) {
       !filtroStatus ||
       (filtroStatus === "ATIVO"
         ? animal.status === "ATIVO"
-        : animal.status !== "ATIVO");
+        : filtroStatus === "INATIVO"
+          ? animal.status === "INATIVO"
+          : animal.status !== "ATIVO" && animal.status !== "INATIVO");
 
     return correspondeBusca && correspondeEspecie && correspondeStatus;
   });
@@ -108,7 +112,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
   function limparFiltros() {
     setBusca("");
     setFiltroEspecie("");
-    setFiltroStatus("");
+    setFiltroStatus("ATIVO");
   }
 
   return (
@@ -202,6 +206,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
             >
               <option value="">Todos os status</option>
               <option value="ATIVO">Ativos</option>
+              <option value="INATIVO">Inativos</option>
               <option value="OUTROS">Outros status</option>
             </select>
           </div>
@@ -211,7 +216,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
               {filtrados.length} de {animais.length} animais
             </p>
 
-            {(busca || filtroEspecie || filtroStatus) && (
+            {(busca || filtroEspecie || filtroStatus !== "ATIVO") && (
               <button
                 type="button"
                 onClick={limparFiltros}
@@ -350,6 +355,7 @@ export default function AnimaisPainel({ animais, especies }: Props) {
       {selecionado && (
         <PerfilAnimal
           animal={selecionado}
+          podeAdministrar={podeAdministrar}
           fechar={() => setSelecionadoId(null)}
         />
       )}
@@ -359,9 +365,11 @@ export default function AnimaisPainel({ animais, especies }: Props) {
 
 function PerfilAnimal({
   animal,
+  podeAdministrar,
   fechar,
 }: {
   animal: Animal;
+  podeAdministrar: boolean;
   fechar: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -472,6 +480,8 @@ function PerfilAnimal({
               <Status valor={animal.status} />
             </Dado>
           </dl>
+
+          <AcaoStatusAnimal animal={animal} podeAdministrar={podeAdministrar} />
         </section>
 
         <fieldset disabled={salvandoVacinacao} className="min-w-0">
@@ -517,6 +527,85 @@ function PerfilAnimal({
         </footer>
       </div>
     </dialog>
+  );
+}
+
+function AcaoStatusAnimal({
+  animal,
+  podeAdministrar,
+}: {
+  animal: Animal;
+  podeAdministrar: boolean;
+}) {
+  const router = useRouter();
+  const enviandoRef = useRef(false);
+  const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState("");
+
+  if (!podeAdministrar) return null;
+
+  if (animal.status !== "ATIVO" && animal.status !== "INATIVO") {
+    return (
+      <p role="status" className="mt-5 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+        Este cadastro tem um status não reconhecido e não pode ser alterado por esta tela.
+      </p>
+    );
+  }
+
+  const novoStatus = animal.status === "ATIVO" ? "INATIVO" : "ATIVO";
+  const acao = novoStatus === "INATIVO" ? "inativar" : "reativar";
+
+  async function alterarStatus() {
+    if (enviandoRef.current) return;
+
+    if (!window.confirm(`Deseja ${acao} ${animal.nome}?`)) return;
+
+    enviandoRef.current = true;
+    setSalvando(true);
+    setErro("");
+    setMensagem("");
+
+    try {
+      const resposta = await fetch("/api/animais/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: animal.id, status: novoStatus }),
+      });
+      const dados = await resposta.json().catch(() => null);
+
+      if (!resposta.ok) {
+        throw new Error(dados?.error || "Não foi possível alterar o status do animal.");
+      }
+
+      setMensagem(dados?.message || "Status do animal atualizado.");
+      router.refresh();
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : "Não foi possível alterar o status do animal.");
+    } finally {
+      enviandoRef.current = false;
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="mt-5 border-t border-slate-100 pt-4">
+      {mensagem && <p role="status" aria-live="polite" className="mb-3 text-sm text-emerald-700">{mensagem}</p>}
+      {erro && <p role="alert" className="mb-3 text-sm text-red-700">{erro}</p>}
+      <button
+        type="button"
+        onClick={alterarStatus}
+        disabled={salvando}
+        className={
+          "w-full rounded-xl border px-4 py-2.5 text-sm font-semibold disabled:cursor-wait disabled:opacity-60 sm:w-auto " +
+          (novoStatus === "INATIVO"
+            ? "border-amber-300 text-amber-800 hover:bg-amber-50"
+            : "border-[#486d6b] text-[#486d6b] hover:bg-[#486d6b]/5")
+        }
+      >
+        {salvando ? "Atualizando status…" : novoStatus === "INATIVO" ? "Inativar animal" : "Reativar animal"}
+      </button>
+    </div>
   );
 }
 
@@ -625,7 +714,7 @@ function Status({ valor }: { valor: string }) {
           : "bg-slate-100 text-slate-600")
       }
     >
-      {valor === "ATIVO" ? "Ativo" : valor}
+      {valor === "ATIVO" ? "Ativo" : valor === "INATIVO" ? "Inativo" : valor}
     </span>
   );
 }

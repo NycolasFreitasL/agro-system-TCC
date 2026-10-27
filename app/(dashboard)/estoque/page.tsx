@@ -10,9 +10,12 @@ export default async function EstoquePage() {
     redirect("/login");
   }
 
+  const podeAdministrar = usuario.permissao_usuario === "PROPRIETARIO";
+
   const [produtos, movimentacoes, contagemHoje] =
     await Promise.all([
       prisma.produto.findMany({
+        where: podeAdministrar ? undefined : { ativo: true },
         include: {
           cultura: {
             select: {
@@ -62,6 +65,7 @@ export default async function EstoquePage() {
         nome_produto: produto.nome_produto,
         categoria: produto.categoria,
         quantidade: Number(produto.quantidade),
+        ativo: produto.ativo,
         estoque_min: Number(produto.estoque_min),
         unidade_medida: produto.unidade_medida,
         id_cultura: produto.id_cultura,
@@ -78,6 +82,7 @@ export default async function EstoquePage() {
         observacao: movimento.observacao,
       }))}
       movimentacoesHoje={Number(contagemHoje[0]?.total ?? 0)}
+      podeAdministrar={podeAdministrar}
     />
   );
 }

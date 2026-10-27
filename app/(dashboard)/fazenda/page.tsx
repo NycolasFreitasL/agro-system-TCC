@@ -4,6 +4,7 @@ import { obterUsuarioAtual } from "@/app/lib/sessao";
 
 import FazendaFormulario from "@/app/components/fazenda-formulario";
 import FazendaEspecies from "@/app/components/fazenda-especies";
+import FazendaCulturas from "@/app/components/fazenda-culturas";
 import FazendaLotes from "@/app/components/fazenda-lotes";
 
 export default async function FazendaPage() {
@@ -27,7 +28,7 @@ export default async function FazendaPage() {
     );
   }
 
-  const [fazenda, especies, lotes] = await Promise.all([
+  const [fazenda, especies, lotes, culturas] = await Promise.all([
     prisma.fazenda.findUnique({
       where: {
         id_fazenda: 1,
@@ -67,6 +68,20 @@ export default async function FazendaPage() {
       },
       orderBy: {
         nome_lote: "asc",
+      },
+    }),
+
+    prisma.cultura.findMany({
+      include: {
+        _count: {
+          select: {
+            produto: true,
+            plantio: true,
+          },
+        },
+      },
+      orderBy: {
+        nome_cultura: "asc",
       },
     }),
   ]);
@@ -154,6 +169,22 @@ export default async function FazendaPage() {
           nome: especie.nome_especie,
           status: especie.status,
           animais: especie._count.animal,
+        }))}
+      />
+
+      <FazendaCulturas
+        culturas={culturas.map((cultura) => ({
+          id: cultura.id_cultura,
+          nome: cultura.nome_cultura,
+          diasGerminacaoMin: cultura.dias_germinacao_min,
+          diasGerminacaoMax: cultura.dias_germinacao_max,
+          cicloDiasMin: cultura.ciclo_dias_min,
+          cicloDiasMax: cultura.ciclo_dias_max,
+          produtividadeMin: cultura.produtividade_min_kg_ha.toString(),
+          produtividadeMax: cultura.produtividade_max_kg_ha.toString(),
+          ativo: cultura.ativo,
+          produtos: cultura._count.produto,
+          plantios: cultura._count.plantio,
         }))}
       />
     </div>

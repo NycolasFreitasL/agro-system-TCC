@@ -31,7 +31,10 @@ function carregar(arquivo, dependencias = {}) {
 
 const regras = carregar("app/lib/estoque-regras.ts");
 class ErroAutenticacao extends Error {
-  status = 401;
+  constructor(mensagem = "Sessão inválida.", status = 401) {
+    super(mensagem);
+    this.status = status;
+  }
 }
 const usuario = { id_usuario: 7, permissao_usuario: "PROPRIETARIO" };
 const sessao = {
@@ -102,6 +105,13 @@ function bancoSimulado(produtos = []) {
           desfazer.push(() => { p.quantidade = anterior; });
           return { count: 1 };
         },
+        update: async ({ where, data }) => {
+          const p = await produto.findUnique({ where });
+          const anterior = { ...p };
+          Object.assign(p, data);
+          desfazer.push(() => Object.assign(p, anterior));
+          return p;
+        },
       };
       const tx = {
         async $queryRaw(partes, ...valores) {
@@ -142,7 +152,7 @@ function bancoSimulado(produtos = []) {
 
 const produtoDose = (extras = {}) => ({
   id_produto: 1, nome_produto: "Vacina A", categoria: "Vacina",
-  unidade_medida: "Dose", quantidade: "10.00", estoque_min: "2.00", ...extras,
+  unidade_medida: "Dose", quantidade: "10.00", estoque_min: "2.00", ativo: true, ...extras,
 });
 const cadastro = (extras = {}) => ({
   nome: "Vacina A", categoria: "Vacina", unidadeMedida: "DOSE",
@@ -215,6 +225,61 @@ test("movimentação inteira registra responsável, saldo e histórico; insufici
   assert.equal(db.estado.movimentos[0].id_usuario, 7);
   assert.equal((await api.POST(requisicao({ idProduto: 1, tipo: "SAIDA", quantidade: "9" }))).status, 400);
   assert.equal(db.estado.movimentos.length, 1);
+});
+test("archiving requires zero balance and allows reactivation without deletion", async () => {
+  const db = bancoSimulado([produtoDose({ quantidade: "1.00" })]);
+  const api = rota("estoque/produtos/arquivamento", db.prisma);
+  const enviar = (ativo) => requisicao({ idProduto: 1, ativo });
+  assert.equal((await api.PATCH(enviar(false))).status, 409);
+  assert.equal(db.estado.produtos[0].ativo, true);
+  db.estado.produtos[0].quantidade = "0.00";
+  assert.equal((await api.PATCH(enviar(false))).status, 200);
+  assert.equal(db.estado.produtos[0].ativo, false);
+  assert.equal(db.estado.produtos.length, 1);
+  assert.equal((await api.PATCH(enviar(true))).status, 200);
+  assert.equal(db.estado.produtos[0].ativo, true);
+});
+test("arquivamento revalida saldo depois do bloqueio da linha", async () => {
+  const produto = produtoDose({ quantidade: "0.00" });
+  const prisma = {
+    async $transaction(funcao) {
+      return funcao({
+        async $queryRaw() { produto.quantidade = "0.25"; },
+        produto: {
+          findUnique: async () => produto,
+          update: async () => assert.fail("Produto com saldo nÃ£o deve ser arquivado"),
+        },
+      });
+    },
+  };
+  const resposta = await rota("estoque/produtos/arquivamento", prisma)
+    .PATCH(requisicao({ idProduto: 1, ativo: false }));
+  assert.equal(resposta.status, 409);
+  assert.equal(produto.ativo, true);
+});
+test("archiving requires owner permission", async () => {
+  const db = bancoSimulado([produtoDose({ quantidade: "0.00" })]);
+  const api = rota("estoque/produtos/arquivamento", db.prisma, {
+    "@/app/lib/sessao": {
+      ...sessao,
+      exigirProprietario: async () => { throw new ErroAutenticacao("Owner only.", 403); },
+    },
+  });
+  assert.equal((await api.PATCH(requisicao({ idProduto: 1, ativo: false }))).status, 403);
+  assert.equal(db.estado.produtos[0].ativo, true);
+});
+test("operações de estoque, alimentação e vacinação rejeitam produto arquivado", async () => {
+  for (const [caminho, corpo] of [
+    ["estoque/movimentacoes", { idProduto: 1, tipo: "SAIDA", quantidade: "1" }],
+    ["animais/alimentacoes", manejo({ unidade: "Dose" })],
+    ["animais/vacinacoes", manejo()],
+  ]) {
+    const db = bancoSimulado([produtoDose({ ativo: false })]);
+    const resposta = await rota(caminho, db.prisma).POST(requisicao(corpo));
+    assert.equal(resposta.status, 409, caminho);
+    assert.equal(db.estado.produtos[0].quantidade, "10.00", caminho);
+    assert.equal(db.estado.movimentos.length, 0, caminho);
+  }
 });
 test("entrada em Dose rejeita ultrapassar o limite sem ajustar saldo", async () => {
   const db = bancoSimulado([produtoDose({ quantidade: "99999999.00" })]);
@@ -325,6 +390,30 @@ test("animal ativo é salvo somente após bloqueio e revalidação da espécie",
   assert.deepEqual(db.eventos.map((e) => e[1]), ["inicio", "bloqueio", "especie.findUnique", "animal.create", "fim"]);
 });
 
+test("alimentacao e vacinacao rejeitam animal inativo no servidor", async () => {
+  for (const [caminho, corpo, produto] of [
+    ["animais/alimentacoes", manejo({ unidade: "KG" }), produtoDose({ categoria: "Alimentacao" })],
+    ["animais/vacinacoes", manejo(), produtoDose()],
+  ]) {
+    const db = bancoSimulado([produto]);
+    db.prisma.animal.findUnique = async () => ({
+      status_animal: "INATIVO",
+      data_nascimento: new Date("2020-01-01"),
+    });
+    const api = rota(caminho, db.prisma);
+
+    const leitura = await api.GET(new Request("http://teste.local/api?idAnimal=1"));
+    assert.equal(leitura.status, 400, `${caminho} selector`);
+
+    const resposta = await api.POST(requisicao(corpo));
+    assert.equal(resposta.status, 400, caminho);
+    assert.equal(db.estado.alimentos.length, 0, caminho);
+    assert.equal(db.estado.vacinas.length, 0, caminho);
+    assert.equal(db.estado.movimentos.length, 0, caminho);
+    assert.equal(db.estado.produtos[0].quantidade, "10.00", caminho);
+  }
+});
+
 const jsx = (type, props, key) => ({ type, props: props ?? {}, key });
 const jsxRuntime = { jsx, jsxs: jsx, Fragment: "fragment" };
 function componente(arquivo, estados) {
@@ -366,6 +455,7 @@ test("Dashboard e filtro da listagem incluem os mesmos produtos no limite", asyn
   const painel = carregar("app/components/estoque-painel.tsx", {
     "react/jsx-runtime": jsxRuntime,
     react: { useId: () => "filtros", useState: () => [estados.shift(), () => {}] },
+    "next/navigation": { useRouter: () => ({ refresh() {} }) },
     "@/app/lib/estoque-regras": regras,
     "@/app/components/produtomodal": { default: () => null, __esModule: true },
     "@/app/components/movimentacaomodal": { default: () => null, __esModule: true },

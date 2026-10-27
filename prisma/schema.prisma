@@ -151,6 +151,7 @@ model produto {
   criado_em      DateTime?      @default(now()) @db.Timestamp(6)
   atualizado_em  DateTime?      @default(now()) @db.Timestamp(6)
   id_cultura     Int?
+  ativo          Boolean        @default(true)
   alimentacao    alimentacao[]
   colheita       colheita[]
   fertilizacao   fertilizacao[]
